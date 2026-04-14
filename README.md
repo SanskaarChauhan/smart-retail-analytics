@@ -50,3 +50,6 @@ smart_retail_analytics/
 - Database integration (MongoDB/Firebase)
 - Real-time data pipeline
 - Advanced recommendation system
+  
+## 🌐 Live Demo
+https://smart-retail-analytics-qocztyepypvuaxxkmhesal.streamlit.app/
