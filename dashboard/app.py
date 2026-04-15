@@ -131,111 +131,86 @@ elif page == "Product Analysis":
 # DEMAND FORECAST
 # =============================
 
-elif page == "Demand Forecast":
-    st.title("Demand Forecast")
+if model_choice == "Linear Regression":
+    st.subheader("Linear Regression Forecast")
 
-    model_choice = st.selectbox("Select Model", [
-        "Linear Regression",
-        "Random Forest",
-        "ARIMA"
-    ])
+    model = LinearRegression()
+    model.fit(monthly[["MonthIndex"]], monthly["Revenue"])
 
-    months_ahead = st.slider("Forecast Months", 3, 12, 6)
+    last_idx = monthly["MonthIndex"].max()
+    future_idx = pd.DataFrame({
+        "MonthIndex": range(last_idx + 1, last_idx + months_ahead + 1)
+    })
 
-    # ---------- Linear Regression ----------
-    if model_choice == "Linear Regression":
-        model = LinearRegression()
-        model.fit(monthly[["MonthIndex"]], monthly["Revenue"])
+    preds = model.predict(future_idx)
 
-        last_idx = monthly["MonthIndex"].max()
-        future_idx = pd.DataFrame({
-            "MonthIndex": range(last_idx + 1, last_idx + months_ahead + 1)
-        })
+    future_dates = pd.date_range(
+        start=monthly["MonthYear"].max() + pd.DateOffset(months=1),
+        periods=months_ahead,
+        freq="MS"
+    )
 
-        preds = model.predict(future_idx)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=monthly["MonthYear"], y=monthly["Revenue"], name="Actual"))
+    fig.add_trace(go.Scatter(x=future_dates, y=preds, name="Forecast", line=dict(dash="dash")))
+    st.plotly_chart(fig, use_container_width=True)
 
-        future_dates = pd.date_range(
-            start=monthly["MonthYear"].max() + pd.DateOffset(months=1),
-            periods=months_ahead,
-            freq="MS"
-        )
+    st.dataframe(pd.DataFrame({
+        "Month": future_dates.strftime("%b %Y"),
+        "Forecast": preds
+    }))
+
+
+elif model_choice == "Random Forest":
+    st.subheader("Random Forest Forecast")
+
+    if "rf" in models:
+
+        monthly_rf = monthly.copy()
+
+        monthly_rf["Month"] = monthly_rf["MonthYear"].dt.month
+        monthly_rf["Quarter"] = monthly_rf["MonthYear"].dt.quarter
+        monthly_rf["Lag1"] = monthly_rf["Revenue"].shift(1)
+        monthly_rf["Lag2"] = monthly_rf["Revenue"].shift(2)
+        monthly_rf["RollingMean"] = monthly_rf["Revenue"].rolling(3).mean()
+
+        monthly_rf = monthly_rf.dropna()
+
+        features = ["MonthIndex", "Month", "Quarter", "Lag1", "Lag2", "RollingMean"]
+
+        preds = models["rf"].predict(monthly_rf[features])
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=monthly["MonthYear"], y=monthly["Revenue"], name="Actual"))
-        fig.add_trace(go.Scatter(x=future_dates, y=preds, name="Forecast", line=dict(dash="dash")))
+        fig.add_trace(go.Scatter(x=monthly_rf["MonthYear"], y=monthly_rf["Revenue"], name="Actual"))
+        fig.add_trace(go.Scatter(x=monthly_rf["MonthYear"], y=preds, name="Predicted", line=dict(dash="dash")))
+
         st.plotly_chart(fig, use_container_width=True)
-
-        st.dataframe(pd.DataFrame({
-            "Month": future_dates.strftime("%b %Y"),
-            "Forecast": preds
-        }))
-
-    # ---------- Random Forest ----------
-    elif model_choice == "Random Forest":
-        st.subheader("Random Forest Forecast")
-
-        if "rf" in models:
-
-            monthly_rf = monthly.copy()
-
-            monthly_rf["Month"] = monthly_rf["MonthYear"].dt.month
-            monthly_rf["Quarter"] = monthly_rf["MonthYear"].dt.quarter
-            monthly_rf["Lag1"] = monthly_rf["Revenue"].shift(1)
-            monthly_rf["Lag2"] = monthly_rf["Revenue"].shift(2)
-            monthly_rf["RollingMean"] = monthly_rf["Revenue"].rolling(3).mean()
-
-            monthly_rf = monthly_rf.dropna()
-
-            features = ["MonthIndex", "Month", "Quarter", "Lag1", "Lag2", "RollingMean"]
-
-            preds = models["rf"].predict(monthly_rf[features])
-
-            fig = go.Figure()
-
-            fig.add_trace(go.Scatter(
-                x=monthly_rf["MonthYear"],
-                y=monthly_rf["Revenue"],
-                mode="lines+markers",
-                name="Actual"
-            ))
-
-            fig.add_trace(go.Scatter(
-                x=monthly_rf["MonthYear"],
-                y=preds,
-                mode="lines+markers",
-                name="Predicted",
-                line=dict(dash="dash")
-            ))
-
-            st.plotly_chart(fig, use_container_width=True)
 
     else:
         st.error("Random Forest model not found")
 
-    # ---------- ARIMA ----------
-    elif model_choice == "ARIMA":
-        series = monthly.set_index("MonthYear")["Revenue"]
 
-        model = ARIMA(series, order=(1,1,1))
-        fitted = model.fit()
+elif model_choice == "ARIMA":
+    st.subheader("ARIMA Forecast")
 
-        forecast = fitted.forecast(steps=months_ahead)
+    series = monthly.set_index("MonthYear")["Revenue"]
 
-        future_dates = pd.date_range(
-            start=series.index[-1] + pd.DateOffset(months=1),
-            periods=months_ahead,
-            freq="MS"
-        )
+    model = ARIMA(series, order=(1,1,1))
+    fitted = model.fit()
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=series.index, y=series.values, name="Actual"))
-        fig.add_trace(go.Scatter(x=future_dates, y=forecast, name="Forecast", line=dict(dash="dash")))
-        st.plotly_chart(fig, use_container_width=True)
+    forecast = fitted.forecast(steps=months_ahead)
 
-        st.dataframe(pd.DataFrame({
-            "Month": future_dates.strftime("%b %Y"),
-            "Forecast": forecast
-        }))
+    future_dates = pd.date_range(
+        start=series.index[-1] + pd.DateOffset(months=1),
+        periods=months_ahead,
+        freq="MS"
+    )
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=series.index, y=series.values, name="Actual"))
+    fig.add_trace(go.Scatter(x=future_dates, y=forecast, name="Forecast", line=dict(dash="dash")))
+
+    st.plotly_chart(fig, use_container_width=True)
 
 # =============================
 # CUSTOMER SEGMENTS
