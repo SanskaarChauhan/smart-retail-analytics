@@ -149,6 +149,13 @@ if st.session_state.user is None:
 # ============================================================
 # DATA LOADING
 # ============================================================
+
+@st.cache_resource
+def load_models():
+    # ... existing code ...
+    st.cache_resource.clear()  # Force reload after retraining
+    return models
+    
 @st.cache_data
 def load_all_data():
     try:
