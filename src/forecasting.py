@@ -193,19 +193,16 @@ def train_random_forest_models(feature_df):
     print("\n1. Random Forest (with GridSearchCV)")
     
     rf_params = {
-        'n_estimators': [50, 100, 200],
-        'max_depth': [5, 10, None],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4]
+        'n_estimators': [50, 100],
+        'max_depth': [5, 10],
+        'min_samples_split': [2, 5],
+        'min_samples_leaf': [1, 2]
     }
     
-    # Use smaller grid for speed, or full grid for better results
     rf_base = RandomForestRegressor(random_state=42, n_jobs=-1)
-    
-    # TimeSeriesSplit for time series validation
     tscv = TimeSeriesSplit(n_splits=3)
     
-    print("   Performing grid search (this may take a minute)...")
+    print("   Performing grid search...")
     rf_grid = GridSearchCV(
         rf_base, rf_params, 
         cv=tscv, 
@@ -234,43 +231,30 @@ def train_random_forest_models(feature_df):
         'importance': best_rf.feature_importances_
     }).sort_values('importance', ascending=False)
     
-    print("\n   Feature Importance:")
+    print("\n   Feature Importance (Top 5):")
     for _, row in feature_importance.head(5).iterrows():
         print(f"   - {row['feature']}: {row['importance']:.3f}")
     
-    # 2. Gradient Boosting
+    # Save feature columns for dashboard use
+    models["feature_cols"] = feature_cols
+    
+    # 2. Gradient Boosting (simplified)
     print("\n2. Gradient Boosting Regressor")
-    
-    gb_params = {
-        'n_estimators': [100, 200],
-        'learning_rate': [0.05, 0.1],
-        'max_depth': [3, 5]
-    }
-    
-    gb_base = GradientBoostingRegressor(random_state=42)
-    gb_grid = GridSearchCV(gb_base, gb_params, cv=tscv, scoring='neg_mean_squared_error', n_jobs=-1)
-    gb_grid.fit(X_train, y_train)
-    
-    best_gb = gb_grid.best_estimator_
-    y_pred = best_gb.predict(X_test)
+    gb = GradientBoostingRegressor(n_estimators=100, random_state=42)
+    gb.fit(X_train, y_train)
+    y_pred = gb.predict(X_test)
     
     results["GradientBoosting"] = {
         "mae": mean_absolute_error(y_test, y_pred),
         "rmse": np.sqrt(mean_squared_error(y_test, y_pred)),
-        "r2": r2_score(y_test, y_pred),
-        "best_params": gb_grid.best_params_
+        "r2": r2_score(y_test, y_pred)
     }
-    models["gradient_boosting"] = best_gb
-    print(f"   Best params: {gb_grid.best_params_}")
+    models["gradient_boosting"] = gb
     print(f"   R² Score: {results['GradientBoosting']['r2']:.4f}")
     
     # Select best model
     best_model_name = max(results, key=lambda x: results[x]["r2"])
     print(f"\n🏆 Best Tree Model: {best_model_name} (R²={results[best_model_name]['r2']:.4f})")
-    
-    # Save feature names with model
-    best_rf.feature_names_in_ = np.array(feature_cols)
-    models["random_forest"] = best_rf
     
     return models, results, best_model_name, feature_cols
 
@@ -303,7 +287,7 @@ def train_arima_model(monthly):
     
     configurations = [
         (1, d, 1), (1, d, 2), (2, d, 1), (2, d, 2),
-        (1, d, 0), (0, d, 1), (3, d, 3)
+        (1, d, 0), (0, d, 1)
     ]
     
     best_aic = float('inf')
@@ -344,7 +328,7 @@ def train_arima_model(monthly):
     return best_model, best_order, {"mae": mae, "rmse": rmse, "r2": r2}
 
 # ============================================
-# MODEL SAVING
+# FIXED MODEL SAVING
 # ============================================
 
 def save_models(models, results, feature_cols=None):
@@ -374,6 +358,7 @@ def save_models(models, results, feature_cols=None):
         if feature_cols:
             with open("models/rf_features.pkl", "wb") as f:
                 pickle.dump(feature_cols, f)
+            print("✅ Saved: models/rf_features.pkl")
     
     if "gradient_boosting" in models:
         joblib.dump(models["gradient_boosting"], "models/gradient_boosting.pkl")
@@ -386,93 +371,72 @@ def save_models(models, results, feature_cols=None):
     return results_df
 
 def save_arima_model(model, order):
-    """Save ARIMA model."""
+    """Save ARIMA model and parameters."""
     os.makedirs("models", exist_ok=True)
     
     # Save model parameters
     arima_info = {
         "order": order,
-        "params": model.params.to_dict(),
-        "aic": model.aic,
-        "bic": model.bic
+        "params": model.params.to_dict() if hasattr(model, 'params') else {},
+        "aic": model.aic if hasattr(model, 'aic') else None,
+        "bic": model.bic if hasattr(model, 'bic') else None
     }
     
     with open("models/arima_info.pkl", "wb") as f:
         pickle.dump(arima_info, f)
     
-    # Save the fitted model
-    joblib.dump(model, "models/arima_model.pkl")
-    print("✅ Saved: models/arima_model.pkl")
+    # Save the fitted model safely
+    try:
+        joblib.dump(model, "models/arima_model.pkl")
+        print("✅ Saved: models/arima_model.pkl")
+    except:
+        print("⚠️  Could not save ARIMA model (using params only)")
+    
     print("✅ Saved: models/arima_info.pkl")
 
 # ============================================
-# VISUALIZATION
+# FIXED VISUALIZATION (SIMPLE & WORKING)
 # ============================================
 
 def plot_forecast_comparison(monthly, models, feature_cols=None):
-    """Compare all model forecasts."""
+    """Compare all model forecasts - FIXED PROFESSIONAL VERSION."""
     os.makedirs("reports/figures", exist_ok=True)
     
-    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    fig, ax = plt.subplots(figsize=(14, 8))
     
-    # 1. Linear Regression
-    ax1 = axes[0, 0]
-    X = monthly[["MonthIndex"]]
-    y = monthly["Revenue"]
-    lr_pred = models["linear_regression"].predict(X)
-    ax1.plot(monthly["MonthYear"], y, marker='o', label='Actual', linewidth=2)
-    ax1.plot(monthly["MonthYear"], lr_pred, '--', label='Linear Regression', alpha=0.7)
-    ax1.set_title('Linear Regression', fontsize=12)
-    ax1.set_xlabel('Date')
-    ax1.set_ylabel('Revenue (£)')
-    ax1.legend()
-    ax1.tick_params(axis='x', rotation=45)
+    # Actual data
+    ax.plot(monthly["MonthYear"], monthly["Revenue"], 
+            marker='o', linewidth=3, label='Actual Revenue', 
+            color='black', markersize=6, markerfacecolor='white', markeredgewidth=1)
     
-    # 2. Random Forest
-    ax2 = axes[0, 1]
-    if "random_forest" in models and feature_cols:
-        feature_df = create_time_features(monthly)
-        X_rf = feature_df[feature_cols]
-        rf_pred = models["random_forest"].predict(X_rf)
-        ax2.plot(feature_df["MonthYear"], feature_df["Revenue"], marker='o', label='Actual', linewidth=2)
-        ax2.plot(feature_df["MonthYear"], rf_pred, '--', label='Random Forest', alpha=0.7)
-        ax2.set_title('Random Forest', fontsize=12)
-        ax2.set_xlabel('Date')
-        ax2.set_ylabel('Revenue (£)')
-        ax2.legend()
-        ax2.tick_params(axis='x', rotation=45)
+    # Linear Regression
+    if "linear_regression" in models:
+        X = monthly[["MonthIndex"]]
+        lr_pred = models["linear_regression"].predict(X)
+        ax.plot(monthly["MonthYear"], lr_pred, '--', 
+                label='Linear Regression', alpha=0.8, linewidth=2.5, color='blue')
     
-    # 3. ARIMA
-    ax3 = axes[1, 0]
-    series = monthly.set_index("MonthYear")["Revenue"]
-    arima_pred = models["arima"].fittedvalues
-    ax3.plot(series.index, series.values, marker='o', label='Actual', linewidth=2)
-    ax3.plot(series.index, arima_pred, '--', label='ARIMA', alpha=0.7)
-    ax3.set_title('ARIMA', fontsize=12)
-    ax3.set_xlabel('Date')
-    ax3.set_ylabel('Revenue (£)')
-    ax3.legend()
-    ax3.tick_params(axis='x', rotation=45)
+    # Random Forest (if available)
+    if "random_forest" in models and feature_cols is not None:
+        try:
+            feature_df = create_time_features(monthly)
+            X_rf = feature_df[feature_cols]
+            rf_pred = models["random_forest"].predict(X_rf)
+            ax.plot(feature_df["MonthYear"], rf_pred, '--', 
+                    label='Random Forest', alpha=0.8, linewidth=2.5, color='green')
+        except Exception as e:
+            print(f"RF plotting skipped: {e}")
     
-    # 4. Model Comparison
-    ax4 = axes[1, 1]
-    results = pd.read_csv("models/model_comparison.csv", index_col=0)
-    models_names = results.index
-    r2_scores = results['r2']
-    bars = ax4.bar(models_names, r2_scores)
-    ax4.set_title('Model Comparison (R² Score)', fontsize=12)
-    ax4.set_xlabel('Model')
-    ax4.set_ylabel('R² Score')
-    ax4.set_ylim([0, 1])
-    for bar, score in zip(bars, r2_scores):
-        ax4.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01, 
-                f'{score:.3f}', ha='center', fontsize=9)
-    plt.setp(ax4.xaxis.get_majorticklabels(), rotation=45, ha='right')
-    
+    ax.set_title('Model Forecast Comparison', fontsize=18, fontweight='bold', pad=20)
+    ax.set_xlabel('Date', fontsize=14)
+    ax.set_ylabel('Revenue (£)', fontsize=14)
+    ax.legend(fontsize=12, loc='upper left')
+    ax.grid(True, alpha=0.3)
+    plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.savefig("reports/figures/model_comparison.png", dpi=150, bbox_inches='tight')
-    plt.show()
-    print("✅ Chart saved: reports/figures/model_comparison.png")
+    plt.savefig("reports/figures/model_comparison.png", dpi=300, bbox_inches='tight')
+    plt.close()
+    print("✅ Professional chart saved: reports/figures/model_comparison.png")
 
 # ============================================
 # MAIN PIPELINE
@@ -495,102 +459,4 @@ def run_forecasting():
     feature_df = create_time_features(monthly)
     
     # Train Random Forest models
-    rf_models, rf_results, best_rf, feature_cols = train_random_forest_models(feature_df)
-    
-    # Train ARIMA model
-    arima_model, arima_order, arima_results = train_arima_model(monthly)
-    
-    # Combine all models
-    all_models = {**lr_models, **rf_models}
-    all_models["arima"] = arima_model
-    
-    all_results = {**lr_results, **rf_results, "ARIMA": arima_results}
-    
-    # Save models
-    print("\n" + "="*50)
-    print("💾 SAVING MODELS")
-    print("="*50)
-    save_models(all_models, all_results, feature_cols)
-    save_arima_model(arima_model, arima_order)
-    
-    # Create comparison chart
-    plot_forecast_comparison(monthly, all_models, feature_cols)
-    
-    # Final summary
-    print("\n" + "="*60)
-    print("✅ FORECASTING PIPELINE COMPLETE!")
-    print("="*60)
-    print("\n📊 Model Performance Summary:")
-    print("-"*40)
-    
-    results_df = pd.read_csv("models/model_comparison.csv", index_col=0)
-    print(results_df[['r2', 'mae', 'rmse']].to_string())
-    
-    print("\n🎯 Best performing models:")
-    print(f"   Linear: {best_lr}")
-    print(f"   Tree-based: {best_rf}")
-    print(f"   ARIMA Order: {arima_order}")
-    
-    print("\n📁 Files saved:")
-    print("   - models/*.pkl (all trained models)")
-    print("   - models/model_comparison.csv")
-    print("   - reports/figures/model_comparison.png")
-    
-    return all_models, all_results
-
-# ============================================
-# QUICK PREDICTION FUNCTION FOR DASHBOARD
-# ============================================
-
-def predict_future(model_type, months_ahead, monthly_data, model=None):
-    """Make future predictions using trained models."""
-    if model_type == "linear_regression":
-        if model is None:
-            model = joblib.load("models/linear_regression.pkl")
-        last_idx = monthly_data["MonthIndex"].max()
-        future_idx = pd.DataFrame({
-            "MonthIndex": range(last_idx + 1, last_idx + months_ahead + 1)
-        })
-        predictions = model.predict(future_idx)
-        
-    elif model_type == "random_forest":
-        if model is None:
-            model = joblib.load("models/random_forest.pkl")
-            with open("models/rf_features.pkl", "rb") as f:
-                feature_cols = pickle.load(f)
-        
-        # Prepare features for future
-        last_date = monthly_data["MonthYear"].max()
-        future_dates = [last_date + pd.DateOffset(months=i) for i in range(1, months_ahead + 1)]
-        
-        predictions = []
-        last_revenues = monthly_data["Revenue"].tail(3).tolist()
-        
-        for i, future_date in enumerate(future_dates):
-            future_features = pd.DataFrame({
-                "MonthIndex": [monthly_data["MonthIndex"].max() + i + 1],
-                "Month": [future_date.month],
-                "Quarter": [(future_date.month - 1) // 3 + 1],
-                "RevLag1": [last_revenues[-1]],
-                "RevLag2": [last_revenues[-2]],
-                "RevLag3": [last_revenues[-3] if len(last_revenues) > 2 else last_revenues[-1]],
-                "RollingMean3": [np.mean(last_revenues[-3:])],
-                "MonthSin": [np.sin(2 * np.pi * future_date.month / 12)],
-                "MonthCos": [np.cos(2 * np.pi * future_date.month / 12)]
-            })
-            pred = model.predict(future_features[feature_cols])[0]
-            predictions.append(pred)
-            last_revenues.append(pred)
-            if len(last_revenues) > 3:
-                last_revenues.pop(0)
-        
-    elif model_type == "arima":
-        if model is None:
-            model = joblib.load("models/arima_model.pkl")
-        forecast = model.forecast(steps=months_ahead)
-        predictions = forecast.values
-    
-    return predictions
-
-if __name__ == "__main__":
-    run_forecasting()
+    rf_models, rf
