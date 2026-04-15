@@ -1,6 +1,10 @@
 # =============================
 # IMPORTS (FIXED)
 # =============================
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.data_preprocessing import preprocess
 from src.clustering import run_clustering
@@ -10,8 +14,6 @@ from src.utils import (
     check_required_files
 )
 
-import sys
-import os
 import warnings
 warnings.filterwarnings("ignore")
 
