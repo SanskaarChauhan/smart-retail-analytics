@@ -448,12 +448,13 @@ elif page == "🔮 Demand Forecast":
     elif len(monthly) < 6:
         st.warning("⚠️ Not enough data for forecasting (need at least 6 months).")
     else:
-        available_models = ["Linear Regression", "ARIMA"]
-        if "rf" in models:
-            available_models.insert(1, "Random Forest")
-        if XGB_AVAILABLE and "xgb" in models:
+        # ================= MODEL LIST =================
+        available_models = ["Linear Regression", "Random Forest", "ARIMA"]
+
+        if XGB_AVAILABLE:
             available_models.append("XGBoost")
-        if PROPHET_AVAILABLE and "prophet" in models:
+
+        if PROPHET_AVAILABLE:
             available_models.append("Prophet")
 
         col1, col2 = st.columns([2, 1])
@@ -464,247 +465,145 @@ elif page == "🔮 Demand Forecast":
 
         st.markdown("---")
 
-        # ── Linear Regression ────────────────────────────────────
+        # ================= LINEAR REGRESSION =================
         if model_choice == "Linear Regression":
             st.subheader("📈 Linear Regression Forecast")
+
             model = models.get("lr") or LinearRegression().fit(
                 monthly[["MonthIndex"]], monthly["Revenue"]
             )
-            last_idx     = monthly["MonthIndex"].max()
-            future_idx   = pd.DataFrame({"MonthIndex": range(last_idx + 1, last_idx + months_ahead + 1)})
-            future_pred  = model.predict(future_idx)
-            last_date    = monthly["MonthYear"].max()
+
+            last_idx = monthly["MonthIndex"].max()
+
+            future_idx = pd.DataFrame({
+                "MonthIndex": list(range(last_idx + 1, last_idx + months_ahead + 1))
+            })
+
+            future_pred = model.predict(future_idx)
+
+            last_date = monthly["MonthYear"].max()
             future_dates = [last_date + pd.DateOffset(months=i) for i in range(1, months_ahead + 1)]
 
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=monthly["MonthYear"], y=monthly["Revenue"],
-                mode="lines+markers", name="Actual Revenue",
-                line=dict(color="royalblue", width=2),
-                hovertemplate="<b>%{x}</b><br>Actual: £%{y:,.2f}<extra></extra>"
+                mode="lines+markers", name="Actual",
+                line=dict(color="royalblue", width=2)
             ))
             fig.add_trace(go.Scatter(
                 x=future_dates, y=future_pred,
                 mode="lines+markers", name="Forecast",
-                line=dict(color="orange", width=2, dash="dash"),
-                hovertemplate="<b>%{x}</b><br>Forecast: £%{y:,.2f}<extra></extra>"
+                line=dict(color="orange", dash="dash")
             ))
-            fig.update_layout(
-                title="Linear Regression — Revenue Forecast",
-                xaxis_title="Month", yaxis_title="Revenue (£)",
-                height=480, template="plotly_white"
-            )
+
             st.plotly_chart(fig, use_container_width=True)
 
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Last Month Actual",  f"£{monthly['Revenue'].iloc[-1]:,.0f}")
-            c2.metric("Next Month Forecast",f"£{future_pred[0]:,.0f}")
-            c3.metric("6-Month Avg Forecast",f"£{np.mean(future_pred[:6]):,.0f}")
-
-            st.subheader("Forecast Table")
-            st.dataframe(pd.DataFrame({
-                "Month"        : [d.strftime("%b %Y") for d in future_dates],
-                "Forecast (£)" : [round(v, 2) for v in future_pred]
-            }), use_container_width=True)
-
-        # ── Random Forest ─────────────────────────────────────────
+        # ================= RANDOM FOREST =================
         elif model_choice == "Random Forest":
             st.subheader("🌲 Random Forest — Actual vs Predicted")
+
             if "rf" in models:
                 monthly_rf = monthly.copy()
-                monthly_rf["Month"]       = monthly_rf["MonthYear"].dt.month
-                monthly_rf["Quarter"]     = monthly_rf["MonthYear"].dt.quarter
-                monthly_rf["RevLag1"]     = monthly_rf["Revenue"].shift(1)
-                monthly_rf["RevLag2"]     = monthly_rf["Revenue"].shift(2)
+
+                monthly_rf["Month"] = monthly_rf["MonthYear"].dt.month
+                monthly_rf["Quarter"] = monthly_rf["MonthYear"].dt.quarter
+                monthly_rf["RevLag1"] = monthly_rf["Revenue"].shift(1)
+                monthly_rf["RevLag2"] = monthly_rf["Revenue"].shift(2)
                 monthly_rf["RollingMean"] = monthly_rf["Revenue"].rolling(3).mean()
+
                 monthly_rf = monthly_rf.dropna().reset_index(drop=True)
 
                 features = ["MonthIndex", "Month", "Quarter", "RevLag1", "RevLag2", "RollingMean"]
-                y_pred   = models["rf"].predict(monthly_rf[features])
+
+                y_pred = models["rf"].predict(monthly_rf[features])
 
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
-                    x=monthly_rf["MonthYear"], y=monthly_rf["Revenue"],
-                    mode="lines+markers", name="Actual",
-                    line=dict(color="royalblue", width=2),
-                    hovertemplate="<b>%{x}</b><br>Actual: £%{y:,.2f}<extra></extra>"
+                    x=monthly_rf["MonthYear"], y=monthly_rf["Revenue"], name="Actual"
                 ))
                 fig.add_trace(go.Scatter(
-                    x=monthly_rf["MonthYear"], y=y_pred,
-                    mode="lines+markers", name="Predicted",
-                    line=dict(color="green", width=2, dash="dash"),
-                    hovertemplate="<b>%{x}</b><br>Predicted: £%{y:,.2f}<extra></extra>"
+                    x=monthly_rf["MonthYear"], y=y_pred, name="Predicted"
                 ))
-                fig.update_layout(
-                    title="Random Forest — Actual vs Predicted Revenue",
-                    xaxis_title="Month", yaxis_title="Revenue (£)",
-                    height=480, template="plotly_white"
-                )
+
                 st.plotly_chart(fig, use_container_width=True)
 
-                mae  = mean_absolute_error(monthly_rf["Revenue"], y_pred)
-                rmse = np.sqrt(mean_squared_error(monthly_rf["Revenue"], y_pred))
-                r2   = r2_score(monthly_rf["Revenue"], y_pred)
-                c1, c2, c3 = st.columns(3)
-                c1.metric("MAE",  f"£{mae:,.2f}")
-                c2.metric("RMSE", f"£{rmse:,.2f}")
-                c3.metric("R²",   f"{r2:.4f}")
-            else:
-                st.warning("Random Forest model not found. Run `python src/forecasting.py` first.")
-
-        # ── ARIMA ─────────────────────────────────────────────────
+        # ================= ARIMA =================
         elif model_choice == "ARIMA":
             st.subheader("📊 ARIMA Forecast")
-            with st.spinner("Running ARIMA model..."):
-                revenue_series = monthly.set_index("MonthYear")["Revenue"]
-                fitted   = ARIMA(revenue_series, order=(1, 1, 1)).fit()
-                forecast = fitted.forecast(steps=months_ahead)
-                forecast_index = pd.date_range(
-                    start=revenue_series.index[-1] + pd.DateOffset(months=1),
-                    periods=months_ahead, freq="MS"
-                )
+
+            revenue_series = monthly.set_index("MonthYear")["Revenue"]
+
+            fitted = ARIMA(revenue_series, order=(1, 1, 1)).fit()
+
+            forecast = fitted.forecast(steps=months_ahead)
+
+            forecast_index = pd.date_range(
+                start=revenue_series.index[-1] + pd.DateOffset(months=1),
+                periods=months_ahead, freq="MS"
+            )
 
             fig = go.Figure()
             fig.add_trace(go.Scatter(
-                x=revenue_series.index, y=revenue_series.values,
-                mode="lines+markers", name="Actual",
-                line=dict(color="royalblue", width=2),
-                hovertemplate="<b>%{x}</b><br>Actual: £%{y:,.2f}<extra></extra>"
+                x=revenue_series.index, y=revenue_series.values, name="Actual"
             ))
             fig.add_trace(go.Scatter(
-                x=forecast_index, y=forecast.values,
-                mode="lines+markers", name="ARIMA Forecast",
-                line=dict(color="red", width=2, dash="dash"),
-                hovertemplate="<b>%{x}</b><br>Forecast: £%{y:,.2f}<extra></extra>"
+                x=forecast_index, y=forecast.values, name="Forecast"
             ))
-            fig.update_layout(
-                title=f"ARIMA — Revenue Forecast ({months_ahead} Months)",
-                xaxis_title="Month", yaxis_title="Revenue (£)",
-                height=480, template="plotly_white"
-            )
+
             st.plotly_chart(fig, use_container_width=True)
 
-            st.subheader("Forecast Table")
-            st.dataframe(pd.DataFrame({
-                "Month"        : [d.strftime("%b %Y") for d in forecast_index],
-                "Forecast (£)" : [round(v, 2) for v in forecast.values]
-            }), use_container_width=True)
-
-        # ── XGBoost ───────────────────────────────────────────────
+        # ================= XGBOOST =================
         elif model_choice == "XGBoost":
             st.subheader("🚀 XGBoost Forecast")
-            if "xgb" in models:
+
+            if not XGB_AVAILABLE:
+                st.error("XGBoost not installed.")
+            else:
                 monthly_xgb = monthly.copy()
-                monthly_xgb["Month"]       = monthly_xgb["MonthYear"].dt.month
-                monthly_xgb["Quarter"]     = monthly_xgb["MonthYear"].dt.quarter
-                monthly_xgb["RevLag1"]     = monthly_xgb["Revenue"].shift(1)
-                monthly_xgb["RevLag2"]     = monthly_xgb["Revenue"].shift(2)
-                monthly_xgb["RevLag3"]     = monthly_xgb["Revenue"].shift(3)
+
+                monthly_xgb["Month"] = monthly_xgb["MonthYear"].dt.month
+                monthly_xgb["Quarter"] = monthly_xgb["MonthYear"].dt.quarter
+                monthly_xgb["RevLag1"] = monthly_xgb["Revenue"].shift(1)
+                monthly_xgb["RevLag2"] = monthly_xgb["Revenue"].shift(2)
                 monthly_xgb["RollingMean"] = monthly_xgb["Revenue"].rolling(3).mean()
-                monthly_xgb["MonthSin"]    = np.sin(2 * np.pi * monthly_xgb["Month"] / 12)
-                monthly_xgb["MonthCos"]    = np.cos(2 * np.pi * monthly_xgb["Month"] / 12)
-                monthly_xgb = monthly_xgb.dropna().reset_index(drop=True)
 
-                features = models.get("feature_cols",
-                    ["MonthIndex","Month","Quarter","RevLag1","RevLag2","RevLag3","RollingMean","MonthSin","MonthCos"])
-                y_pred = models["xgb"].predict(monthly_xgb[features])
+                monthly_xgb = monthly_xgb.dropna()
+
+                features = ["MonthIndex", "Month", "Quarter", "RevLag1", "RevLag2", "RollingMean"]
+
+                model = xgb.XGBRegressor(n_estimators=100, max_depth=5)
+                model.fit(monthly_xgb[features], monthly_xgb["Revenue"])
+
+                y_pred = model.predict(monthly_xgb[features])
 
                 fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=monthly_xgb["MonthYear"], y=monthly_xgb["Revenue"],
-                    mode="lines+markers", name="Actual",
-                    line=dict(color="royalblue", width=2),
-                    hovertemplate="<b>%{x}</b><br>Actual: £%{y:,.2f}<extra></extra>"
-                ))
-                fig.add_trace(go.Scatter(
-                    x=monthly_xgb["MonthYear"], y=y_pred,
-                    mode="lines+markers", name="XGBoost Predicted",
-                    line=dict(color="purple", width=2, dash="dash"),
-                    hovertemplate="<b>%{x}</b><br>Predicted: £%{y:,.2f}<extra></extra>"
-                ))
-                fig.update_layout(
-                    title="XGBoost — Actual vs Predicted Revenue",
-                    xaxis_title="Month", yaxis_title="Revenue (£)",
-                    height=480, template="plotly_white"
-                )
+                fig.add_trace(go.Scatter(x=monthly_xgb["MonthYear"], y=monthly_xgb["Revenue"], name="Actual"))
+                fig.add_trace(go.Scatter(x=monthly_xgb["MonthYear"], y=y_pred, name="XGBoost"))
+
                 st.plotly_chart(fig, use_container_width=True)
 
-                mae  = mean_absolute_error(monthly_xgb["Revenue"], y_pred)
-                rmse = np.sqrt(mean_squared_error(monthly_xgb["Revenue"], y_pred))
-                r2   = r2_score(monthly_xgb["Revenue"], y_pred)
-                c1, c2, c3 = st.columns(3)
-                c1.metric("MAE",  f"£{mae:,.2f}")
-                c2.metric("RMSE", f"£{rmse:,.2f}")
-                c3.metric("R²",   f"{r2:.4f}")
-            else:
-                st.warning("XGBoost model not found. Run `python src/forecasting.py` first.")
-
-        # ── Prophet ───────────────────────────────────────────────
+        # ================= PROPHET =================
         elif model_choice == "Prophet":
-            st.subheader("🔮 Prophet (Meta) Forecast")
-            if "prophet" in models:
-                prophet_model = models["prophet"]
-                future = prophet_model.make_future_dataframe(periods=months_ahead, freq="MS")
-                forecast_df = prophet_model.predict(future)
+            st.subheader("🔮 Prophet Forecast")
 
-                hist = forecast_df[forecast_df["ds"] <= monthly["MonthYear"].max()]
-                fcast = forecast_df[forecast_df["ds"] > monthly["MonthYear"].max()]
+            if not PROPHET_AVAILABLE:
+                st.error("Prophet not installed.")
+            else:
+                prophet_df = monthly[["MonthYear", "Revenue"]].rename(
+                    columns={"MonthYear": "ds", "Revenue": "y"}
+                )
+
+                model = Prophet()
+                model.fit(prophet_df)
+
+                future = model.make_future_dataframe(periods=months_ahead, freq="MS")
+                forecast = model.predict(future)
 
                 fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=monthly["MonthYear"], y=monthly["Revenue"],
-                    mode="lines+markers", name="Actual",
-                    line=dict(color="royalblue", width=2),
-                    hovertemplate="<b>%{x}</b><br>Actual: £%{y:,.2f}<extra></extra>"
-                ))
-                fig.add_trace(go.Scatter(
-                    x=hist["ds"], y=hist["yhat"],
-                    mode="lines", name="Prophet Fitted",
-                    line=dict(color="gray", width=1, dash="dot"),
-                    hovertemplate="<b>%{x}</b><br>Fitted: £%{y:,.2f}<extra></extra>"
-                ))
-                fig.add_trace(go.Scatter(
-                    x=fcast["ds"], y=fcast["yhat"],
-                    mode="lines+markers", name="Prophet Forecast",
-                    line=dict(color="darkorange", width=2, dash="dash"),
-                    hovertemplate="<b>%{x}</b><br>Forecast: £%{y:,.2f}<extra></extra>"
-                ))
-                fig.add_trace(go.Scatter(
-                    x=pd.concat([fcast["ds"], fcast["ds"][::-1]]),
-                    y=pd.concat([fcast["yhat_upper"], fcast["yhat_lower"][::-1]]),
-                    fill="toself", fillcolor="rgba(255,165,0,0.15)",
-                    line=dict(color="rgba(255,255,255,0)"),
-                    name="Confidence Band",
-                    hoverinfo="skip"
-                ))
-                fig.update_layout(
-                    title=f"Prophet — Revenue Forecast ({months_ahead} Months)",
-                    xaxis_title="Month", yaxis_title="Revenue (£)",
-                    height=480, template="plotly_white"
-                )
+                fig.add_trace(go.Scatter(x=prophet_df["ds"], y=prophet_df["y"], name="Actual"))
+                fig.add_trace(go.Scatter(x=forecast["ds"], y=forecast["yhat"], name="Forecast"))
+
                 st.plotly_chart(fig, use_container_width=True)
-
-                st.subheader("Forecast Table")
-                st.dataframe(pd.DataFrame({
-                    "Month"            : [d.strftime("%b %Y") for d in fcast["ds"]],
-                    "Forecast (£)"     : fcast["yhat"].round(2).values,
-                    "Lower Bound (£)"  : fcast["yhat_lower"].round(2).values,
-                    "Upper Bound (£)"  : fcast["yhat_upper"].round(2).values
-                }), use_container_width=True)
-            else:
-                st.warning("Prophet model not found. Run `python src/forecasting.py` first.")
-
-        # ── Download button ───────────────────────────────────────
-        if model_choice in ["Linear Regression", "ARIMA"] and "future_dates" in dir():
-            if st.button("📥 Download Forecast CSV"):
-                csv_df = pd.DataFrame({
-                    "Month"        : [d.strftime("%b %Y") for d in future_dates],
-                    "Forecast (£)" : [round(v, 2) for v in future_pred]
-                })
-                st.download_button(
-                    "⬇️ Download", csv_df.to_csv(index=False).encode("utf-8"),
-                    "forecast.csv", "text/csv"
-                )
 
 # ============================================================
 # PAGE 5 — CUSTOMER SEGMENTS
