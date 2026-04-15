@@ -9,7 +9,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # import your modules
-from src.analysis import load_data
+from analysis import load_data
 from src.forecasting import linear_regression_forecast, random_forest_forecast, arima_forecast
 from src.clustering import perform_clustering
 
