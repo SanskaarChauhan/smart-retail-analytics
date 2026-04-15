@@ -130,3 +130,14 @@ def reject_user(username):
     pending = load_pending()
     pending = [req for req in pending if req["username"] != username]
     save_pending(pending)
+
+
+def delete_user(username):
+    """Permanently delete a user (ADMIN ONLY)."""
+    users = load_users()
+    if username in users:
+        del users[username]
+        save_users(users)
+        print(f"User {username} deleted")
+    else:
+        print(f"User {username} not found")
