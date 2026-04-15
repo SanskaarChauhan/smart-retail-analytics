@@ -74,7 +74,7 @@ def create_time_features(monthly):
 def train_xgboost_model(feature_df):
     """Train XGBoost with hyperparameter tuning."""
     print("\n" + "="*50)
-    print("🚀 TRAINING XGBOOST MODEL")
+    print(" TRAINING XGBOOST MODEL")
     print("="*50)
     
     feature_cols = ["MonthIndex", "Month", "Quarter", "RevLag1", "RevLag2", 
@@ -134,7 +134,7 @@ def train_xgboost_model(feature_df):
 def train_prophet_model(monthly):
     """Train Facebook Prophet model."""
     print("\n" + "="*50)
-    print("🔮 TRAINING PROPHET (Meta) MODEL")
+    print(" TRAINING PROPHET (Meta) MODEL")
     print("="*50)
     
     # Prepare Prophet data
@@ -180,7 +180,7 @@ def train_prophet_model(monthly):
 # ============================================
 def train_all_models(monthly):
     """Train ALL models including new ones."""
-    print("\n🚀 Training ALL forecasting models...")
+    print("\n Training ALL forecasting models...")
     
     # 1. Linear models
     lr_models, lr_results, _ = train_linear_regression_models(monthly)
@@ -247,7 +247,7 @@ def save_all_models(models, results, feature_cols):
 def run_forecasting():
     """Enhanced pipeline with XGBoost + Prophet."""
     print("\n" + "="*70)
-    print("🚀 ADVANCED FORECASTING PIPELINE (7 Models)")
+    print(" ADVANCED FORECASTING PIPELINE (7 Models)")
     print("="*70)
     
     df = load_clean_data()
@@ -266,7 +266,7 @@ def run_forecasting():
     
     # FINAL SUMMARY
     print("\n" + "="*70)
-    print("🏆 MODEL PERFORMANCE RANKING")
+    print(" MODEL PERFORMANCE RANKING")
     print("="*70)
     top_models = results_df.sort_values('r2', ascending=False)[['r2', 'rmse', 'mae']]
     print(top_models.round(4))
