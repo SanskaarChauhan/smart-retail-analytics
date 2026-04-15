@@ -51,7 +51,7 @@ except ImportError:
 # ============================================================
 st.set_page_config(
     page_title="Smart Retail Analytics",
-    page_icon="📊",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -106,39 +106,39 @@ if "user" not in st.session_state:
 # LOGIN PAGE
 # ============================================================
 def show_login():
-    st.title("🔐 Smart Retail Analytics")
-    st.markdown("### Company Internal Portal")
+    st.title("Smart Retail Analytics")
+    st.markdown("Company Internal Portal")
     st.markdown("---")
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("#### Sign In")
-        username = st.text_input("👤 Username", placeholder="Enter username")
-        password = st.text_input("🔑 Password", type="password", placeholder="Enter password")
+        st.markdown("Sign In")
+        username = st.text_input("Username", placeholder="Enter username")
+        password = st.text_input("Password", type="password", placeholder="Enter password")
         st.markdown("")
 
-        if st.button("🚀 Login", type="primary", use_container_width=True):
+        if st.button("Login", type="primary", use_container_width=True):
             from src.auth import login as auth_login
             success, role = auth_login(username, password)
             if success:
                 st.session_state.user = username
                 st.session_state.role = role
-                st.success(f"✅ Welcome, {username}!")
+                st.success(f"Welcome, {username}!")
                 st.rerun()
             else:
-                st.error("❌ Invalid credentials. Contact your administrator.")
+                st.error("Invalid credentials. Contact your administrator.")
 
         st.markdown("---")
         st.caption("Don't have an account? Contact your company admin.")
 
-        with st.expander("🧪 Request Access"):
+        with st.expander("Request Access"):
             new_user = st.text_input("New Username", key="req_user")
             new_pass = st.text_input("New Password", type="password", key="req_pass")
             if st.button("Submit Request", key="submit_req"):
                 if new_user and new_pass:
                     from src.auth import signup_request
                     result = signup_request(new_user, new_pass)
-                    st.info(f"📋 {result}")
+                    st.info(f"{result}")
                 else:
                     st.warning("Please fill in both fields.")
 
@@ -196,45 +196,44 @@ else:
 # ============================================================
 # SIDEBAR
 # ============================================================
-st.sidebar.title("📊 Smart Retail Analytics")
-st.sidebar.markdown(f"👋 **{st.session_state.user.title()}**")
+st.sidebar.title("Smart Retail Analytics")
+st.sidebar.markdown(f"Hello {st.session_state.user.title()}")
 
 if st.session_state.role == "admin":
-    st.sidebar.markdown('<span class="admin-badge">👑 ADMIN</span>', unsafe_allow_html=True)
+    st.sidebar.markdown('<span class="admin-badge">ADMIN</span>', unsafe_allow_html=True)
 else:
-    st.sidebar.markdown('<span class="employee-badge">👤 EMPLOYEE</span>', unsafe_allow_html=True)
+    st.sidebar.markdown('<span class="employee-badge">EMPLOYEE</span>', unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
 
 if st.session_state.role == "admin":
     pages = [
-        "📈 Overview",
-        "📉 Sales Trends",
-        "📦 Product Analysis",
-        "🔮 Demand Forecast",
-        "👥 Customer Segments",
-        "📤 Upload Data",
-        "⚙️ Admin Panel"
+        "Overview",
+        "Sales Trends",
+        "Product Analysis",
+        "Demand Forecast",
+        "Customer Segments",
+        "Upload Data",
+        "Admin Panel"
     ]
 else:
     pages = [
-        "📈 Overview",
-        "📉 Sales Trends",
-        "📦 Product Analysis",
-        "🔮 Demand Forecast",
-        "👥 Customer Segments"
+        "Overview",
+        "Sales Trends",
+        "Product Analysis",
+        "Demand Forecast",
+        "Customer Segments"
     ]
 
 page = st.sidebar.radio("Navigation", pages)
 
 st.sidebar.markdown("---")
 if data_loaded:
-    st.sidebar.caption(f"📅 Data: {metrics.get('Date From','N/A')} → {metrics.get('Date To','N/A')}")
-status = "🟢 Online" if data_loaded else "🔴 Offline"
+    st.sidebar.caption(f"Data: {metrics.get('Date From','N/A')} → {metrics.get('Date To','N/A')}")
+status = "Online" if data_loaded else "Offline"
 st.sidebar.caption(f"Status: {status}")
 
-
-if st.sidebar.button("🚪 Logout", use_container_width=True):
+if st.sidebar.button("Logout", use_container_width=True):
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.rerun()
@@ -244,25 +243,25 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
 # ============================================================
 def admin_only():
     if st.session_state.role != "admin":
-        st.error("🔒 **Admin access required.**")
+        st.error("Admin access required.")
         st.stop()
 
 # ============================================================
 # PAGE 1 — OVERVIEW
 # ============================================================
-if page == "📈 Overview":
-    st.title("📊 Executive Dashboard")
-    st.markdown("**AI-Based Smart Retail Analytics and Demand Forecasting System**")
+if page == "Overview":
+    st.title("Executive Dashboard")
+    st.markdown("AI-Based Smart Retail Analytics and Demand Forecasting System")
     st.markdown("---")
 
     if not data_loaded:
-        st.warning("⚠️ No data available. Admin must upload and run the pipeline first.")
+        st.warning("No data available. Admin must upload and run the pipeline first.")
     else:
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("💰 Total Revenue",    f"£{metrics['Total Revenue']:,.2f}")
-        c2.metric("📋 Total Orders",     f"{metrics['Total Orders']:,}")
-        c3.metric("👥 Unique Customers", f"{metrics['Unique Customers']:,}")
-        c4.metric("📦 Unique Products",  f"{metrics['Unique Products']:,}")
+        c1.metric("Total Revenue",    f"£{metrics['Total Revenue']:,.2f}")
+        c2.metric("Total Orders",     f"{metrics['Total Orders']:,}")
+        c3.metric("Unique Customers", f"{metrics['Unique Customers']:,}")
+        c4.metric("Unique Products",  f"{metrics['Unique Products']:,}")
 
         st.markdown("---")
         col1, col2 = st.columns(2)
@@ -333,12 +332,12 @@ if page == "📈 Overview":
 # ============================================================
 # PAGE 2 — SALES TRENDS
 # ============================================================
-elif page == "📉 Sales Trends":
-    st.title("📉 Sales Trends Analysis")
+elif page == "Sales Trends":
+    st.title("Sales Trends Analysis")
     st.markdown("---")
 
     if not data_loaded:
-        st.warning("⚠️ No data available.")
+        st.warning("No data available.")
     else:
         years = sorted(df["Year"].unique())
         selected_year = st.selectbox("Filter by Year", ["All"] + [str(y) for y in years])
@@ -398,12 +397,12 @@ elif page == "📉 Sales Trends":
 # ============================================================
 # PAGE 3 — PRODUCT ANALYSIS
 # ============================================================
-elif page == "📦 Product Analysis":
-    st.title("📦 Product Performance Analysis")
+elif page == "Product Analysis":
+    st.title("Product Performance Analysis")
     st.markdown("---")
 
     if not data_loaded:
-        st.warning("⚠️ No data available.")
+        st.warning("No data available.")
     else:
         n = st.slider("Number of top products", 5, 20, 10)
         top      = get_top_products(df, n)
@@ -439,16 +438,15 @@ elif page == "📦 Product Analysis":
 # ============================================================
 # PAGE 4 — DEMAND FORECAST
 # ============================================================
-elif page == "🔮 Demand Forecast":
-    st.title("🔮 Demand Forecasting")
+elif page == "Demand Forecast":
+    st.title("Demand Forecasting")
     st.markdown("---")
 
     if not data_loaded:
-        st.warning("⚠️ No data available.")
+        st.warning("No data available.")
     elif len(monthly) < 6:
-        st.warning("⚠️ Not enough data for forecasting (need at least 6 months).")
+        st.warning("Not enough data for forecasting (need at least 6 months).")
     else:
-        # ================= MODEL LIST =================
         available_models = ["Linear Regression", "Random Forest", "ARIMA"]
 
         if XGB_AVAILABLE:
@@ -459,15 +457,14 @@ elif page == "🔮 Demand Forecast":
 
         col1, col2 = st.columns([2, 1])
         with col1:
-            model_choice = st.selectbox("🎯 Select Forecast Model", available_models)
+            model_choice = st.selectbox("Select Forecast Model", available_models)
         with col2:
-            months_ahead = st.slider("📅 Months to Forecast", 3, 12, 6)
+            months_ahead = st.slider("Months to Forecast", 3, 12, 6)
 
         st.markdown("---")
 
-        # ================= LINEAR REGRESSION =================
         if model_choice == "Linear Regression":
-            st.subheader("📈 Linear Regression Forecast")
+            st.subheader("Linear Regression Forecast")
 
             model = models.get("lr") or LinearRegression().fit(
                 monthly[["MonthIndex"]], monthly["Revenue"]
@@ -498,9 +495,8 @@ elif page == "🔮 Demand Forecast":
 
             st.plotly_chart(fig, use_container_width=True)
 
-        # ================= RANDOM FOREST =================
         elif model_choice == "Random Forest":
-            st.subheader("🌲 Random Forest — Actual vs Predicted")
+            st.subheader("Random Forest — Actual vs Predicted")
 
             if "rf" in models:
                 monthly_rf = monthly.copy()
@@ -511,7 +507,7 @@ elif page == "🔮 Demand Forecast":
                 monthly_rf["RevLag2"] = monthly_rf["Revenue"].shift(2)
                 monthly_rf["RollingMean"] = monthly_rf["Revenue"].rolling(3).mean()
 
-                monthly_rf = monthly_rf.dropna().reset_index(drop=True)
+                monthly_rf = monthly_rf.dropna().reset_index
 
                 features = ["MonthIndex", "Month", "Quarter", "RevLag1", "RevLag2", "RollingMean"]
 
@@ -529,7 +525,7 @@ elif page == "🔮 Demand Forecast":
 
         # ================= ARIMA =================
         elif model_choice == "ARIMA":
-            st.subheader("📊 ARIMA Forecast")
+            st.subheader("ARIMA Forecast")
 
             revenue_series = monthly.set_index("MonthYear")["Revenue"]
 
@@ -554,7 +550,7 @@ elif page == "🔮 Demand Forecast":
 
         # ================= XGBOOST =================
         elif model_choice == "XGBoost":
-            st.subheader("🚀 XGBoost Forecast")
+            st.subheader(" XGBoost Forecast")
 
             if not XGB_AVAILABLE:
                 st.error("XGBoost not installed.")
@@ -625,7 +621,7 @@ elif page == "🔮 Demand Forecast":
 
         # ================= PROPHET =================
         elif model_choice == "Prophet":
-            st.subheader("🔮 Prophet Forecast")
+            st.subheader(" Prophet Forecast")
 
             if not PROPHET_AVAILABLE:
                 st.error("Prophet not installed.")
@@ -699,7 +695,7 @@ elif page == "👥 Customer Segments":
         ).round(2).reset_index()
         st.dataframe(summary, use_container_width=True, hide_index=True)
 
-        st.subheader("⭐ Top 10 Most Valuable Customers")
+        st.subheader("Top 10 Most Valuable Customers")
         top_customers = rfm.nlargest(10, "Monetary")[
             ["CustomerID", "Segment", "Recency", "Frequency", "Monetary"]
         ].copy()
@@ -710,12 +706,12 @@ elif page == "👥 Customer Segments":
 # ============================================================
 # PAGE 6 — UPLOAD DATA (ADMIN ONLY)
 # ============================================================
-elif page == "📤 Upload Data":
+elif page == " Upload Data":
     admin_only()
 
-    st.title("📤 Upload New Data")
+    st.title(" Upload New Data")
     st.markdown("---")
-    st.info("🔒 **Admin only.** Upload a new retail dataset to update the dashboard.")
+    st.info(" **Admin only.** Upload a new retail dataset to update the dashboard.")
 
     file = st.file_uploader("Choose Excel or CSV file", type=["csv", "xlsx"])
 
@@ -726,27 +722,27 @@ elif page == "📤 Upload Data":
             else:
                 df_new = pd.read_excel(file)
 
-            st.success(f"✅ File read successfully — {df_new.shape[0]:,} rows, {df_new.shape[1]} columns")
+            st.success(f" File read successfully — {df_new.shape[0]:,} rows, {df_new.shape[1]} columns")
             st.dataframe(df_new.head(5), use_container_width=True)
 
             os.makedirs("data/raw", exist_ok=True)
             df_new.to_excel("data/raw/retail_sales.xlsx", index=False)
-            st.success("✅ Saved to `data/raw/retail_sales.xlsx`")
+            st.success(" Saved to `data/raw/retail_sales.xlsx`")
 
             st.markdown("---")
-            st.subheader("🔄 Run Pipeline")
+            st.subheader(" Run Pipeline")
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("▶️ Run Preprocessing", type="primary"):
+                if st.button(" Run Preprocessing", type="primary"):
                     with st.spinner("Running preprocessing..."):
                         preprocess()
-                    st.success("✅ Preprocessing complete!")
+                    st.success(" Preprocessing complete!")
                     st.cache_data.clear()
             with col2:
-                if st.button("▶️ Run Clustering", type="secondary"):
+                if st.button(" Run Clustering", type="secondary"):
                     with st.spinner("Running clustering..."):
                         run_clustering()
-                    st.success("✅ Clustering complete!")
+                    st.success(" Clustering complete!")
                     st.cache_data.clear()
 
         except Exception as e:
@@ -755,30 +751,30 @@ elif page == "📤 Upload Data":
 # ============================================================
 # PAGE 7 — ADMIN PANEL (ADMIN ONLY)
 # ============================================================
-elif page == "⚙️ Admin Panel":
+elif page == " Admin Panel":
     admin_only()
 
-    st.title("⚙️ Admin Control Panel")
+    st.title(" Admin Control Panel")
     st.markdown("---")
-    st.success(f"👑 Logged in as **{st.session_state.user}** — Full Admin Access")
+    st.success(f" Logged in as **{st.session_state.user}** — Full Admin Access")
 
     # ── Pipeline Controls ─────────────────────────────────────────
-    st.subheader("🔧 Pipeline Controls")
+    st.subheader(" Pipeline Controls")
     col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("🔄 Re-run Preprocessing", use_container_width=True):
+        if st.button(" Re-run Preprocessing", use_container_width=True):
             with st.spinner("Running..."):
                 preprocess()
-            st.success("✅ Done!")
+            st.success(" Done!")
             st.cache_data.clear()
     with col2:
-        if st.button("🔄 Re-run Clustering", use_container_width=True):
+        if st.button(" Re-run Clustering", use_container_width=True):
             with st.spinner("Running..."):
                 run_clustering()
-            st.success("✅ Done!")
+            st.success(" Done!")
             st.cache_data.clear()
     with col3:
-        if st.button("📁 Check File Status", use_container_width=True):
+        if st.button(" Check File Status", use_container_width=True):
             check_required_files()
 
     st.markdown("---")
@@ -790,11 +786,11 @@ elif page == "⚙️ Admin Panel":
     pending_requests = get_pending_requests()
 
     if pending_requests:
-        st.markdown(f"#### 📥 Pending Requests ({len(pending_requests)})")
+        st.markdown(f"####  Pending Requests ({len(pending_requests)})")
         for req in pending_requests:
             st.markdown(f"""
             <div class="pending-card">
-                <strong>👤 {req['username']}</strong> — wants to join as <em>{req.get('role','employee')}</em>
+                <strong> {req['username']}</strong> — wants to join as <em>{req.get('role','employee')}</em>
             </div>
             """, unsafe_allow_html=True)
             col1, col2, col3 = st.columns([2, 1, 1])
