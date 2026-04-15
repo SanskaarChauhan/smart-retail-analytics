@@ -507,7 +507,7 @@ elif page == "Demand Forecast":
                 monthly_rf["RevLag2"] = monthly_rf["Revenue"].shift(2)
                 monthly_rf["RollingMean"] = monthly_rf["Revenue"].rolling(3).mean()
 
-                monthly_rf = monthly_rf.dropna().reset_index
+                monthly_rf = monthly_rf.dropna().reset_index(drop=True)
 
                 features = ["MonthIndex", "Month", "Quarter", "RevLag1", "RevLag2", "RollingMean"]
 
@@ -523,7 +523,6 @@ elif page == "Demand Forecast":
 
                 st.plotly_chart(fig, use_container_width=True)
 
-        # ================= ARIMA =================
         elif model_choice == "ARIMA":
             st.subheader("ARIMA Forecast")
 
@@ -548,9 +547,8 @@ elif page == "Demand Forecast":
 
             st.plotly_chart(fig, use_container_width=True)
 
-        # ================= XGBOOST =================
         elif model_choice == "XGBoost":
-            st.subheader(" XGBoost Forecast")
+            st.subheader("XGBoost Forecast")
 
             if not XGB_AVAILABLE:
                 st.error("XGBoost not installed.")
@@ -572,7 +570,6 @@ elif page == "Demand Forecast":
 
                 y_pred = model.predict(monthly_xgb[features])
 
-                # ================= FUTURE =================
                 last_idx = monthly_xgb["MonthIndex"].max()
 
                 future = pd.DataFrame({
@@ -586,14 +583,11 @@ elif page == "Demand Forecast":
 
                 future_pred = model.predict(future)
 
-                # Future dates
                 last_date = monthly_xgb["MonthYear"].iloc[-1]
                 future_dates = [last_date + pd.DateOffset(months=i) for i in range(1, months_ahead + 1)]
 
-                # ================= PLOT =================
                 fig = go.Figure()
 
-                # Actual
                 fig.add_trace(go.Scatter(
                     x=monthly_xgb["MonthYear"],
                     y=monthly_xgb["Revenue"],
@@ -601,7 +595,6 @@ elif page == "Demand Forecast":
                     line=dict(color="blue")
                 ))
 
-                # Predicted (training fit)
                 fig.add_trace(go.Scatter(
                     x=monthly_xgb["MonthYear"],
                     y=y_pred,
@@ -609,7 +602,6 @@ elif page == "Demand Forecast":
                     line=dict(color="orange")
                 ))
 
-                # Future forecast
                 fig.add_trace(go.Scatter(
                     x=future_dates,
                     y=future_pred,
@@ -619,9 +611,8 @@ elif page == "Demand Forecast":
 
                 st.plotly_chart(fig, use_container_width=True)
 
-        # ================= PROPHET =================
         elif model_choice == "Prophet":
-            st.subheader(" Prophet Forecast")
+            st.subheader("Prophet Forecast")
 
             if not PROPHET_AVAILABLE:
                 st.error("Prophet not installed.")
@@ -645,12 +636,12 @@ elif page == "Demand Forecast":
 # ============================================================
 # PAGE 5 — CUSTOMER SEGMENTS
 # ============================================================
-elif page == "👥 Customer Segments":
-    st.title("👥 Customer Segmentation (RFM Analysis)")
+elif page == "Customer Segments":
+    st.title("Customer Segmentation (RFM Analysis)")
     st.markdown("---")
 
     if not data_loaded or rfm is None or rfm.empty:
-        st.warning("⚠️ RFM data not available. Run `python src/clustering.py` first.")
+        st.warning("RFM data not available. Run `python src/clustering.py` first.")
     else:
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Customers",  f"{len(rfm):,}")
@@ -706,12 +697,12 @@ elif page == "👥 Customer Segments":
 # ============================================================
 # PAGE 6 — UPLOAD DATA (ADMIN ONLY)
 # ============================================================
-elif page == " Upload Data":
+elif page == "Upload Data":
     admin_only()
 
-    st.title(" Upload New Data")
+    st.title("Upload New Data")
     st.markdown("---")
-    st.info(" **Admin only.** Upload a new retail dataset to update the dashboard.")
+    st.info("Admin only. Upload a new retail dataset to update the dashboard.")
 
     file = st.file_uploader("Choose Excel or CSV file", type=["csv", "xlsx"])
 
@@ -722,75 +713,72 @@ elif page == " Upload Data":
             else:
                 df_new = pd.read_excel(file)
 
-            st.success(f" File read successfully — {df_new.shape[0]:,} rows, {df_new.shape[1]} columns")
+            st.success(f"File read successfully — {df_new.shape[0]:,} rows, {df_new.shape[1]} columns")
             st.dataframe(df_new.head(5), use_container_width=True)
 
             os.makedirs("data/raw", exist_ok=True)
             df_new.to_excel("data/raw/retail_sales.xlsx", index=False)
-            st.success(" Saved to `data/raw/retail_sales.xlsx`")
+            st.success("Saved to `data/raw/retail_sales.xlsx`")
 
             st.markdown("---")
-            st.subheader(" Run Pipeline")
+            st.subheader("Run Pipeline")
             col1, col2 = st.columns(2)
             with col1:
-                if st.button(" Run Preprocessing", type="primary"):
+                if st.button("Run Preprocessing", type="primary"):
                     with st.spinner("Running preprocessing..."):
                         preprocess()
-                    st.success(" Preprocessing complete!")
+                    st.success("Preprocessing complete!")
                     st.cache_data.clear()
             with col2:
-                if st.button(" Run Clustering", type="secondary"):
+                if st.button("Run Clustering", type="secondary"):
                     with st.spinner("Running clustering..."):
                         run_clustering()
-                    st.success(" Clustering complete!")
+                    st.success("Clustering complete!")
                     st.cache_data.clear()
 
         except Exception as e:
-            st.error(f"❌ Upload failed: {e}")
+            st.error(f"Upload failed: {e}")
 
 # ============================================================
 # PAGE 7 — ADMIN PANEL (ADMIN ONLY)
 # ============================================================
-elif page == " Admin Panel":
+elif page == "Admin Panel":
     admin_only()
 
-    st.title(" Admin Control Panel")
+    st.title("Admin Control Panel")
     st.markdown("---")
-    st.success(f" Logged in as **{st.session_state.user}** — Full Admin Access")
+    st.success(f"Logged in as {st.session_state.user} — Full Admin Access")
 
-    # ── Pipeline Controls ─────────────────────────────────────────
-    st.subheader(" Pipeline Controls")
+    st.subheader("Pipeline Controls")
     col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button(" Re-run Preprocessing", use_container_width=True):
+        if st.button("Re-run Preprocessing", use_container_width=True):
             with st.spinner("Running..."):
                 preprocess()
-            st.success(" Done!")
+            st.success("Done!")
             st.cache_data.clear()
     with col2:
-        if st.button(" Re-run Clustering", use_container_width=True):
+        if st.button("Re-run Clustering", use_container_width=True):
             with st.spinner("Running..."):
                 run_clustering()
-            st.success(" Done!")
+            st.success("Done!")
             st.cache_data.clear()
     with col3:
-        if st.button(" Check File Status", use_container_width=True):
+        if st.button("Check File Status", use_container_width=True):
             check_required_files()
 
     st.markdown("---")
 
-    # ── User Management — Single Page ────────────────────────────
-    st.subheader("👥 User Management")
+    st.subheader("User Management")
 
-    # Pending requests section
     pending_requests = get_pending_requests()
 
     if pending_requests:
-        st.markdown(f"####  Pending Requests ({len(pending_requests)})")
+        st.markdown(f"Pending Requests ({len(pending_requests)})")
         for req in pending_requests:
             st.markdown(f"""
             <div class="pending-card">
-                <strong> {req['username']}</strong> — wants to join as <em>{req.get('role','employee')}</em>
+                <strong>{req['username']}</strong> — wants to join as <em>{req.get('role','employee')}</em>
             </div>
             """, unsafe_allow_html=True)
             col1, col2, col3 = st.columns([2, 1, 1])
@@ -802,48 +790,47 @@ elif page == " Admin Panel":
                     label_visibility="collapsed"
                 )
             with col2:
-                if st.button("✅ Approve", key=f"approve_{req['username']}", use_container_width=True):
+                if st.button("Approve", key=f"approve_{req['username']}", use_container_width=True):
                     approve_user(req["username"], assigned_role)
-                    st.success(f"✅ {req['username']} approved as {assigned_role}!")
+                    st.success(f"{req['username']} approved as {assigned_role}!")
                     st.rerun()
             with col3:
-                if st.button("❌ Reject", key=f"reject_{req['username']}", use_container_width=True):
+                if st.button("Reject", key=f"reject_{req['username']}", use_container_width=True):
                     reject_user(req["username"])
-                    st.warning(f"❌ {req['username']} rejected.")
+                    st.warning(f"{req['username']} rejected.")
                     st.rerun()
     else:
-        st.info("✅ No pending access requests.")
+        st.info("No pending access requests.")
 
     st.markdown("---")
 
-    # Existing users section
-    st.markdown("#### 👤 Existing Users")
+    st.markdown("Existing Users")
     users = load_users()
 
     if not users:
         st.warning("No users found.")
     else:
         for username, data in users.items():
-            role_badge = "🔴 admin" if data["role"] == "admin" else "🔵 employee"
+            role_badge = "admin" if data["role"] == "admin" else "employee"
             col1, col2, col3 = st.columns([3, 2, 2])
             with col1:
                 st.markdown(f"""
                 <div class="user-card">
-                    <strong>👤 {username}</strong><br>
+                    <strong>{username}</strong><br>
                     <small>{role_badge}</small>
                 </div>
                 """, unsafe_allow_html=True)
             with col2:
                 st.markdown("")
                 st.markdown("")
-                st.caption(f"Role: **{data['role'].upper()}**")
+                st.caption(f"Role: {data['role'].upper()}")
             with col3:
                 st.markdown("")
                 st.markdown("")
                 if username == st.session_state.user:
                     st.caption("(You — cannot delete)")
                 else:
-                    if st.button(f"🗑️ Remove {username}", key=f"del_{username}", use_container_width=True):
+                    if st.button(f"Remove {username}", key=f"del_{username}", use_container_width=True):
                         delete_user(username)
-                        st.error(f"🗑️ **{username}** has been removed.")
+                        st.error(f"{username} has been removed.")
                         st.rerun()
