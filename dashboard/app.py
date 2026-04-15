@@ -193,9 +193,11 @@ elif page == "Demand Forecast":
         
         model = LinearRegression().fit(X, y)
         
-        future = pd.DataFrame({
-            "MonthIndex": range(X.max()[0]+1, X.max()[0]+7)
-        })
+        last_idx = monthly["MonthIndex"].max()
+
+future = pd.DataFrame({
+    "MonthIndex": list(range(last_idx + 1, last_idx + 7))
+})
         
         pred = model.predict(future)
         
