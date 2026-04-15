@@ -9,3 +9,4 @@ mlxtend
 seaborn
 joblib
 openpyxl
+plotly
