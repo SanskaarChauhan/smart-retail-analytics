@@ -10,3 +10,6 @@ seaborn
 joblib
 openpyxl
 plotly
+xgboost
+prophet
+cmdstanpy
