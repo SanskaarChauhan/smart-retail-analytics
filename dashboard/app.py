@@ -64,9 +64,18 @@ def load_all():
     rfm = load_rfm()
     return df, rfm
 
-df, rfm = load_all()
-metrics = summary_metrics(df)
-monthly = get_monthly_revenue(df)
+
+try:
+    df, rfm = load_all()
+    metrics = summary_metrics(df)
+    monthly = get_monthly_revenue(df)
+    data_loaded = True
+except:
+    st.warning("No data found. Please upload data in 'Upload Data' page.")
+    df, rfm = None, None
+    metrics = {}
+    monthly = None
+    data_loaded = False
 
 # =============================
 # SIDEBAR
@@ -94,16 +103,19 @@ if st.sidebar.button("Logout"):
 
 if page == "Overview":
     st.title("Dashboard")
+    
+    
+    if not data_loaded:
+        st.info("No data available. Please upload data in 'Upload Data' page.")
+    else:
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Revenue", f"£{metrics['Total Revenue']:,.2f}")
+        c2.metric("Orders", f"{metrics['Total Orders']:,}")
+        c3.metric("Customers", f"{metrics['Unique Customers']:,}")
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Revenue", f"£{metrics['Total Revenue']:,.2f}")
-    c2.metric("Orders", f"{metrics['Total Orders']:,}")
-    c3.metric("Customers", f"{metrics['Unique Customers']:,}")
-
-    st.subheader("Sales Trend")
-
-    fig = px.line(monthly, x="MonthYear", y="Revenue")
-    st.plotly_chart(fig, use_container_width=True)
+        st.subheader("Sales Trend")
+        fig = px.line(monthly, x="MonthYear", y="Revenue")
+        st.plotly_chart(fig, use_container_width=True)
 
 # =============================
 # SALES
@@ -111,9 +123,12 @@ if page == "Overview":
 
 elif page == "Sales Trends":
     st.title("Sales Trends")
-
-    fig = px.line(monthly, x="MonthYear", y="Revenue")
-    st.plotly_chart(fig, use_container_width=True)
+    
+    if not data_loaded:
+        st.info("No data available. Please upload data in 'Upload Data' page.")
+    else:
+        fig = px.line(monthly, x="MonthYear", y="Revenue")
+        st.plotly_chart(fig, use_container_width=True)
 
 # =============================
 # PRODUCT ANALYSIS
@@ -121,96 +136,123 @@ elif page == "Sales Trends":
 
 elif page == "Product Analysis":
     st.title("Top Products")
-
-    top = get_top_products(df, 10)
-
-    fig = px.bar(top, x="Product", y="Revenue")
-    st.plotly_chart(fig, use_container_width=True)
+    
+    if not data_loaded:
+        st.info("No data available. Please upload data in 'Upload Data' page.")
+    else:
+        top = get_top_products(df, 10)
+        fig = px.bar(top, x="Product", y="Revenue")
+        st.plotly_chart(fig, use_container_width=True)
 
 # =============================
 # DEMAND FORECAST
 # =============================
 
-if model_choice == "Linear Regression":
-    st.subheader("Linear Regression Forecast")
-
-    model = LinearRegression()
-    model.fit(monthly[["MonthIndex"]], monthly["Revenue"])
-
-    last_idx = monthly["MonthIndex"].max()
-    future_idx = pd.DataFrame({
-        "MonthIndex": range(last_idx + 1, last_idx + months_ahead + 1)
-    })
-
-    preds = model.predict(future_idx)
-
-    future_dates = pd.date_range(
-        start=monthly["MonthYear"].max() + pd.DateOffset(months=1),
-        periods=months_ahead,
-        freq="MS"
+elif page == "Demand Forecast":
+    st.title("Demand Forecast")
+    
+    if not data_loaded:
+        st.info("No data available. Please upload data in 'Upload Data' page.")
+        st.stop()
+    
+    
+    model_choice = st.selectbox(
+        "Select Model",
+        ["Linear Regression", "Random Forest", "ARIMA"]
     )
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=monthly["MonthYear"], y=monthly["Revenue"], name="Actual"))
-    fig.add_trace(go.Scatter(x=future_dates, y=preds, name="Forecast", line=dict(dash="dash")))
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.dataframe(pd.DataFrame({
-        "Month": future_dates.strftime("%b %Y"),
-        "Forecast": preds
-    }))
-
-
-elif model_choice == "Random Forest":
-    st.subheader("Random Forest Forecast")
-
-    if "rf" in models:
-
-        monthly_rf = monthly.copy()
-
-        monthly_rf["Month"] = monthly_rf["MonthYear"].dt.month
-        monthly_rf["Quarter"] = monthly_rf["MonthYear"].dt.quarter
-        monthly_rf["Lag1"] = monthly_rf["Revenue"].shift(1)
-        monthly_rf["Lag2"] = monthly_rf["Revenue"].shift(2)
-        monthly_rf["RollingMean"] = monthly_rf["Revenue"].rolling(3).mean()
-
-        monthly_rf = monthly_rf.dropna()
-
-        features = ["MonthIndex", "Month", "Quarter", "Lag1", "Lag2", "RollingMean"]
-
-        preds = models["rf"].predict(monthly_rf[features])
-
+    
+    months_ahead = st.slider("Months to Forecast", 1, 12, 6)
+    
+    
+    @st.cache_resource
+    def load_models():
+        models = {}
+        try:
+            import joblib
+            if os.path.exists("models/random_forest.pkl"):
+                models["rf"] = joblib.load("models/random_forest.pkl")
+        except:
+            pass
+        return models
+    
+    models = load_models()
+    
+    if model_choice == "Linear Regression":
+        st.subheader("Linear Regression Forecast")
+        
+        model = LinearRegression()
+        model.fit(monthly[["MonthIndex"]], monthly["Revenue"])
+        
+        last_idx = monthly["MonthIndex"].max()
+        future_idx = pd.DataFrame({
+            "MonthIndex": range(last_idx + 1, last_idx + months_ahead + 1)
+        })
+        
+        preds = model.predict(future_idx)
+        
+        future_dates = pd.date_range(
+            start=monthly["MonthYear"].max() + pd.DateOffset(months=1),
+            periods=months_ahead,
+            freq="MS"
+        )
+        
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=monthly_rf["MonthYear"], y=monthly_rf["Revenue"], name="Actual"))
-        fig.add_trace(go.Scatter(x=monthly_rf["MonthYear"], y=preds, name="Predicted", line=dict(dash="dash")))
-
+        fig.add_trace(go.Scatter(x=monthly["MonthYear"], y=monthly["Revenue"], name="Actual"))
+        fig.add_trace(go.Scatter(x=future_dates, y=preds, name="Forecast", line=dict(dash="dash")))
         st.plotly_chart(fig, use_container_width=True)
-
-    else:
-        st.error("Random Forest model not found")
-
-
-elif model_choice == "ARIMA":
-    st.subheader("ARIMA Forecast")
-
-    series = monthly.set_index("MonthYear")["Revenue"]
-
-    model = ARIMA(series, order=(1,1,1))
-    fitted = model.fit()
-
-    forecast = fitted.forecast(steps=months_ahead)
-
-    future_dates = pd.date_range(
-        start=series.index[-1] + pd.DateOffset(months=1),
-        periods=months_ahead,
-        freq="MS"
-    )
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=series.index, y=series.values, name="Actual"))
-    fig.add_trace(go.Scatter(x=future_dates, y=forecast, name="Forecast", line=dict(dash="dash")))
-
-    st.plotly_chart(fig, use_container_width=True)
+        
+        st.dataframe(pd.DataFrame({
+            "Month": future_dates.strftime("%b %Y"),
+            "Forecast Revenue": preds
+        }))
+    
+    elif model_choice == "Random Forest":
+        st.subheader("Random Forest Forecast")
+        
+        if "rf" in models:
+            monthly_rf = monthly.copy()
+            
+            monthly_rf["Month"] = monthly_rf["MonthYear"].dt.month
+            monthly_rf["Quarter"] = monthly_rf["MonthYear"].dt.quarter
+            monthly_rf["Lag1"] = monthly_rf["Revenue"].shift(1)
+            monthly_rf["Lag2"] = monthly_rf["Revenue"].shift(2)
+            monthly_rf["RollingMean"] = monthly_rf["Revenue"].rolling(3).mean()
+            
+            monthly_rf = monthly_rf.dropna()
+            
+            features = ["MonthIndex", "Month", "Quarter", "Lag1", "Lag2", "RollingMean"]
+            
+            preds = models["rf"].predict(monthly_rf[features])
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=monthly_rf["MonthYear"], y=monthly_rf["Revenue"], name="Actual"))
+            fig.add_trace(go.Scatter(x=monthly_rf["MonthYear"], y=preds, name="Predicted", line=dict(dash="dash")))
+            
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.error("Random Forest model not found. Please train the model first.")
+    
+    elif model_choice == "ARIMA":
+        st.subheader("ARIMA Forecast")
+        
+        series = monthly.set_index("MonthYear")["Revenue"]
+        
+        model = ARIMA(series, order=(1,1,1))
+        fitted = model.fit()
+        
+        forecast = fitted.forecast(steps=months_ahead)
+        
+        future_dates = pd.date_range(
+            start=series.index[-1] + pd.DateOffset(months=1),
+            periods=months_ahead,
+            freq="MS"
+        )
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=series.index, y=series.values, name="Actual"))
+        fig.add_trace(go.Scatter(x=future_dates, y=forecast, name="Forecast", line=dict(dash="dash")))
+        
+        st.plotly_chart(fig, use_container_width=True)
 
 # =============================
 # CUSTOMER SEGMENTS
@@ -218,38 +260,47 @@ elif model_choice == "ARIMA":
 
 elif page == "Customer Segments":
     st.title("Customer Segments")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        fig = px.scatter(rfm, x="Frequency", y="Monetary", color="Segment")
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col2:
-        seg_counts = rfm["Segment"].value_counts().reset_index()
-        seg_counts.columns = ["Segment", "Customers"]
-        fig = px.bar(seg_counts, x="Segment", y="Customers")
-        st.plotly_chart(fig, use_container_width=True)
-
-    # RFM TABLE
-    st.subheader("RFM Summary")
-    summary = rfm.groupby("Segment").agg(
-        Customers=("CustomerID", "count"),
-        Avg_Recency=("Recency", "mean"),
-        Avg_Frequency=("Frequency", "mean"),
-        Avg_Monetary=("Monetary", "mean")
-    ).round(2).reset_index()
-
-    st.dataframe(summary)
-
-    # TOP PRODUCT PER CUSTOMER
-    st.subheader("Top Product per Customer")
-
-    cust_prod = df.groupby(["CustomerID", "Description"])["Quantity"].sum().reset_index()
-    idx = cust_prod.groupby("CustomerID")["Quantity"].idxmax()
-    top_customer = cust_prod.loc[idx]
-
-    st.dataframe(top_customer)
+    
+    if not data_loaded or rfm is None:
+        st.info("No customer segments data available. Please upload data first.")
+    else:
+        
+        if "Segment" not in rfm.columns:
+            # Create segments based on RFM scores
+            rfm["Segment"] = pd.qcut(rfm["Recency"], 4, labels=["Gold", "Silver", "Bronze", "Low"])
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            fig = px.scatter(rfm, x="Frequency", y="Monetary", color="Segment", 
+                           title="Customer Segments")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            seg_counts = rfm["Segment"].value_counts().reset_index()
+            seg_counts.columns = ["Segment", "Customers"]
+            fig = px.bar(seg_counts, x="Segment", y="Customers", title="Segment Distribution")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # RFM TABLE
+        st.subheader("RFM Summary")
+        summary = rfm.groupby("Segment").agg(
+            Customers=("CustomerID", "count"),
+            Avg_Recency=("Recency", "mean"),
+            Avg_Frequency=("Frequency", "mean"),
+            Avg_Monetary=("Monetary", "mean")
+        ).round(2).reset_index()
+        
+        st.dataframe(summary)
+        
+        # TOP PRODUCT PER CUSTOMER
+        st.subheader("Top Product per Customer")
+        
+        cust_prod = df.groupby(["CustomerID", "Description"])["Quantity"].sum().reset_index()
+        idx = cust_prod.groupby("CustomerID")["Quantity"].idxmax()
+        top_customer = cust_prod.loc[idx]
+        
+        st.dataframe(top_customer.head(100))
 
 # =============================
 # UPLOAD DATA
@@ -257,16 +308,42 @@ elif page == "Customer Segments":
 
 elif page == "Upload Data":
     st.title("Upload Data")
-
-    file = st.file_uploader("Upload file")
-
-    if file:
-        df_new = pd.read_csv(file) if file.name.endswith(".csv") else pd.read_excel(file)
-
-        os.makedirs("data/raw", exist_ok=True)
-        df_new.to_excel("data/raw/retail_sales.xlsx", index=False)
-
-        st.success("File uploaded successfully")
+    
+    uploaded_file = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx"])
+    
+    if uploaded_file:
+        try:
+            # Read file
+            if uploaded_file.name.endswith(".csv"):
+                df_new = pd.read_csv(uploaded_file)
+            else:
+                df_new = pd.read_excel(uploaded_file)
+            
+            
+            required_cols = ["InvoiceNo", "StockCode", "Description", "Quantity", 
+                           "InvoiceDate", "UnitPrice", "CustomerID", "Country"]
+            
+            missing_cols = [col for col in required_cols if col not in df_new.columns]
+            if missing_cols:
+                st.error(f"Missing required columns: {missing_cols}")
+            else:
+                # Save file
+                os.makedirs("data/raw", exist_ok=True)
+                df_new.to_excel("data/raw/retail_sales.xlsx", index=False)
+                
+                st.success("File uploaded successfully! Please run preprocessing.")
+                
+                
+                if st.button("Run Preprocessing"):
+                    with st.spinner("Processing data..."):
+                        from data_preprocessing import preprocess
+                        preprocess()
+                        st.success("Data preprocessing complete!")
+                        st.cache_data.clear()
+                        st.rerun()
+                        
+        except Exception as e:
+            st.error(f"Error uploading file: {e}")
 
 # =============================
 # ADMIN PANEL
@@ -274,8 +351,21 @@ elif page == "Upload Data":
 
 elif page == "Admin Panel":
     st.title("Admin Panel")
-
+    
     if st.session_state.role != "admin":
-        st.warning("Access Denied")
+        st.warning("Access Denied. Admin privileges required.")
     else:
-        st.success("Admin Access Granted")
+        st.success(f"Welcome Admin {st.session_state.user}")
+        
+        # Add some admin functionality
+        st.subheader("System Information")
+        st.json({
+            "User": st.session_state.user,
+            "Role": st.session_state.role,
+            "Data Loaded": data_loaded
+        })
+        
+        if data_loaded:
+            st.subheader("Data Overview")
+            st.write(f"Total Records: {len(df):,}")
+            st.write(f"Date Range: {df['InvoiceDate'].min()} to {df['InvoiceDate'].max()}")
