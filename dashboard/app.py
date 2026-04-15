@@ -207,30 +207,52 @@ elif page == "Demand Forecast":
         }))
     
     elif model_choice == "Random Forest":
-        st.subheader("Random Forest Forecast")
+    st.subheader("Random Forest Forecast")
+    
+    if "rf" in models:
+        monthly_rf = monthly.copy()
         
-        if "rf" in models:
-            monthly_rf = monthly.copy()
+        monthly_rf["Month"] = monthly_rf["MonthYear"].dt.month
+        monthly_rf["Quarter"] = monthly_rf["MonthYear"].dt.quarter
+        monthly_rf["Lag1"] = monthly_rf["Revenue"].shift(1)
+        monthly_rf["Lag2"] = monthly_rf["Revenue"].shift(2)
+        monthly_rf["RollingMean"] = monthly_rf["Revenue"].rolling(3).mean()
+        
+        monthly_rf = monthly_rf.dropna()
+        
+        # 🔥 FIX: Define features with exact names expected by model
+        features = ["MonthIndex", "Month", "Quarter", "Lag1", "Lag2", "RollingMean"]
+        
+        # Check if model has feature names stored
+        if hasattr(models["rf"], 'feature_names_in_'):
+            expected_features = models["rf"].feature_names_in_
+            st.info(f"Model expects features: {list(expected_features)}")
             
-            monthly_rf["Month"] = monthly_rf["MonthYear"].dt.month
-            monthly_rf["Quarter"] = monthly_rf["MonthYear"].dt.quarter
-            monthly_rf["Lag1"] = monthly_rf["Revenue"].shift(1)
-            monthly_rf["Lag2"] = monthly_rf["Revenue"].shift(2)
-            monthly_rf["RollingMean"] = monthly_rf["Revenue"].rolling(3).mean()
-            
-            monthly_rf = monthly_rf.dropna()
-            
-            features = ["MonthIndex", "Month", "Quarter", "Lag1", "Lag2", "RollingMean"]
-            
-            preds = models["rf"].predict(monthly_rf[features])
+            # Ensure we have all expected features
+            missing_features = set(expected_features) - set(monthly_rf.columns)
+            if missing_features:
+                st.error(f"Missing features in data: {missing_features}")
+            else:
+                # Use only the features the model expects
+                X_pred = monthly_rf[expected_features]
+                preds = models["rf"].predict(X_pred)
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=monthly_rf["MonthYear"], y=monthly_rf["Revenue"], name="Actual"))
+                fig.add_trace(go.Scatter(x=monthly_rf["MonthYear"], y=preds, name="Predicted", line=dict(dash="dash")))
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            # Fallback for older models without feature names
+            st.warning("Model doesn't have feature names stored. Using default features.")
+            X_pred = monthly_rf[features]
+            preds = models["rf"].predict(X_pred)
             
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=monthly_rf["MonthYear"], y=monthly_rf["Revenue"], name="Actual"))
             fig.add_trace(go.Scatter(x=monthly_rf["MonthYear"], y=preds, name="Predicted", line=dict(dash="dash")))
-            
             st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.error("Random Forest model not found. Please train the model first.")
+    else:
+        st.error("Random Forest model not found. Please train the model first.")
     
     elif model_choice == "ARIMA":
         st.subheader("ARIMA Forecast")
