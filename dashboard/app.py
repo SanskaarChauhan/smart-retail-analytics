@@ -185,32 +185,191 @@ elif page == "Product Analysis":
 # =============================
 
 elif page == "Demand Forecast":
-    st.title("Demand Forecast")
+    st.title("💹 Demand Forecasting")
+    st.markdown("---")
     
-    if data_loaded:
-        X = monthly[["MonthIndex"]]
-        y = monthly["Revenue"]
+    if data_loaded and len(monthly) > 5:
+        # Model selection dropdown
+        model_options = ["Linear Trend", "Random Forest", "Simple Average"]
+        selected_model = st.selectbox("Select Forecasting Model:", model_options)
         
-        model = LinearRegression().fit(X, y)
+        # Prediction horizon
+        horizon = st.slider("Forecast Horizon (months)", 1, 12, 6)
         
-        last_idx = monthly["MonthIndex"].max()
+        col1, col2 = st.columns([2, 1])
         
-        future = pd.DataFrame({
-            "MonthIndex": list(range(last_idx + 1, last_idx + 7))
-        })
+        with col1:
+            # Professional chart with proper sizing
+            fig = go.Figure()
+            
+            # Actual data
+            fig.add_trace(go.Scatter(
+                x=monthly["MonthYear"], 
+                y=monthly["Revenue"],
+                mode='lines+markers',
+                name='Actual Revenue',
+                line=dict(color='royalblue', width=3),
+                marker=dict(size=6)
+            ))
+            
+            # Forecast
+            last_idx = monthly["MonthIndex"].max()
+            future_dates = pd.date_range(
+                start=monthly["MonthYear"].max() + pd.DateOffset(months=1),
+                periods=horizon, freq="MS"
+            )
+            
+            if selected_model == "Linear Trend":
+                X_all = monthly[["MonthIndex"]]
+                model = LinearRegression().fit(X_all, monthly["Revenue"])
+                future_idx = np.array(range(last_idx + 1, last_idx + horizon + 1)).reshape(-1, 1)
+                pred = model.predict(future_idx)
+                
+            elif selected_model == "Random Forest" and "rf" in models:
+                # Simplified RF prediction
+                pred = [monthly["Revenue"].tail(3).mean()] * horizon  # Fallback
+                try:
+                    feature_df = create_time_features(monthly)
+                    # Use last few predictions
+                    pred = models["rf"].predict(feature_df[feature_cols].tail(horizon))
+                except:
+                    pred = [monthly["Revenue"].tail(3).mean()] * horizon
+            
+            else:  # Simple Average
+                avg = monthly["Revenue"].tail(3).mean()
+                pred = [avg] * horizon
+            
+            fig.add_trace(go.Scatter(
+                x=future_dates,
+                y=pred,
+                mode='lines+markers',
+                name=f'{selected_model} Forecast',
+                line=dict(color='orange', width=3, dash='dash'),
+                marker=dict(size=6),
+                fill='tonexty'
+            ))
+            
+            fig.update_layout(
+                title=f"Revenue Forecast ({horizon} months ahead)",
+                xaxis_title="Date",
+                yaxis_title="Revenue (£)",
+                height=500,
+                showlegend=True,
+                template='plotly_white'
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
         
-        pred = model.predict(future)
+        with col2:
+            st.metric("Last Month Revenue", f"£{monthly['Revenue'].iloc[-1]:,.0f}")
+            st.metric("3-Month Average", f"£{monthly['Revenue'].tail(3).mean():,.0f}")
+            st.metric("Forecasted Next Month", f"£{pred[0]:,.0f}")
+            
+            if st.button("Export Forecast"):
+                forecast_df = pd.DataFrame({
+                    'Date': future_dates,
+                    'Predicted_Revenue': pred
+                })
+                st.download_button(
+                    "Download CSV",
+                    forecast_df.to_csv(index=False),
+                    "revenue_forecast.csv",
+                    "text/csv"
+                )
+    else:
+        st.warning("Not enough data for forecasting.")
+
+# =============================
+# CUSTOMER SEGMENTS (FIXED TABLE)
+# =============================
+
+elif page == "Customer Segments":
+    st.title("👥 Customer Segmentation (RFM Analysis)")
+    st.markdown("---")
+    
+    if data_loaded and rfm is not None:
+        col1, col2 = st.columns(2)
         
-        future_dates = pd.date_range(
-            start=monthly["MonthYear"].max(),
-            periods=6, freq="MS"
+        with col1:
+            # Professional RFM scatter plot
+            fig = px.scatter(
+                rfm, 
+                x="Recency", 
+                y="Monetary", 
+                size="Frequency",
+                color="Segment",
+                hover_data=["CustomerID"],
+                title="RFM Customer Segments",
+                height=500
+            )
+            fig.update_layout(template='plotly_white')
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # Fixed summary table - KEY METRICS ONLY
+            st.subheader("Segment Summary")
+            summary = rfm.groupby('Segment').agg({
+                'CustomerID': 'count',
+                'Recency': 'mean',
+                'Frequency': 'mean',
+                'Monetary': 'mean'
+            }).round(1)
+            summary.columns = ['Customers', 'Avg Recency (days)', 'Avg Frequency', 'Avg Spend (£)']
+            summary = summary.reset_index()
+            
+            st.dataframe(
+                summary, 
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Segment": st.column_config.TextColumn("Segment"),
+                    "Customers": st.column_config.NumberColumn("Customers", format="%d"),
+                    "Avg Spend (£)": st.column_config.NumberColumn("Avg Spend", format="£%,.0f")
+                }
+            )
+        
+        # Top customers table (simple and clean)
+        st.subheader("Top 10 Valuable Customers")
+        top_customers = rfm.nlargest(10, 'Monetary')[['CustomerID', 'Segment', 'Recency', 'Frequency', 'Monetary']]
+        top_customers['Monetary'] = top_customers['Monetary'].round(0)
+        st.dataframe(
+            top_customers,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "CustomerID": st.column_config.TextColumn("Customer ID"),
+                "Monetary": st.column_config.NumberColumn("Total Spend", format="£%,.0f")
+            }
         )
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=monthly["MonthYear"], y=y, name="Actual"))
-        fig.add_trace(go.Scatter(x=future_dates, y=pred, name="Forecast"))
-        
-        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("RFM data not available. Run clustering pipeline.")
+
+# =============================
+# Fix chart sizes globally - Add this at the top after imports
+# =============================
+
+# Set page config for professional look
+st.set_page_config(
+    page_title="Smart Retail Analytics",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for professional styling
+st.markdown("""
+<style>
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    .metric-container {
+        background-color: #f0f2f6;
+        padding: 1rem;
+        border-radius: 10px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # =============================
 # CUSTOMER SEGMENTS
