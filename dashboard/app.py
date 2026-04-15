@@ -1,3 +1,13 @@
+
+from src.data_preprocessing import preprocess
+from src.clustering import run_clustering
+from src.forecasting import run_forecasting
+from src.utils import check_required_files
+
+if not check_required_files():
+    preprocess()
+    run_clustering()
+    run_forecasting()
 import sys
 import os
 
