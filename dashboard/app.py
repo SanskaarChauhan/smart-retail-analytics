@@ -33,6 +33,26 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from statsmodels.tsa.arima.model import ARIMA
 
+
+REQUIRED_COLUMNS = [
+    "InvoiceNo",
+    "StockCode",
+    "Description",
+    "Quantity",
+    "InvoiceDate",
+    "UnitPrice",
+    "CustomerID",
+    "Country"
+]
+
+def validate_data(df):
+    missing = [col for col in REQUIRED_COLUMNS if col not in df.columns]
+    
+    if missing:
+        return False, f"Missing columns: {missing}"
+    
+    return True, "Valid dataset"
+
 # ── Try importing optional advanced models ────────────────────────
 try:
     import xgboost as xgb
@@ -45,6 +65,7 @@ try:
     PROPHET_AVAILABLE = True
 except ImportError:
     PROPHET_AVAILABLE = False
+
 
 # ============================================================
 # PAGE CONFIG
