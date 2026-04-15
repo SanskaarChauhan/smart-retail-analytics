@@ -576,11 +576,52 @@ elif page == "🔮 Demand Forecast":
 
                 y_pred = model.predict(monthly_xgb[features])
 
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=monthly_xgb["MonthYear"], y=monthly_xgb["Revenue"], name="Actual"))
-                fig.add_trace(go.Scatter(x=monthly_xgb["MonthYear"], y=y_pred, name="XGBoost"))
+# ================= FUTURE =================
+last_idx = monthly_xgb["MonthIndex"].max()
 
-                st.plotly_chart(fig, use_container_width=True)
+future = pd.DataFrame({
+    "MonthIndex": range(last_idx + 1, last_idx + months_ahead + 1),
+    "Month": [(monthly_xgb["Month"].iloc[-1] + i) % 12 + 1 for i in range(months_ahead)],
+    "Quarter": [(monthly_xgb["Quarter"].iloc[-1] + i) % 4 + 1 for i in range(months_ahead)],
+    "RevLag1": [monthly_xgb["Revenue"].iloc[-1]] * months_ahead,
+    "RevLag2": [monthly_xgb["Revenue"].iloc[-2]] * months_ahead,
+    "RollingMean": [monthly_xgb["Revenue"].tail(3).mean()] * months_ahead
+})
+
+future_pred = model.predict(future)
+
+# Future dates
+last_date = monthly_xgb["MonthYear"].iloc[-1]
+future_dates = [last_date + pd.DateOffset(months=i) for i in range(1, months_ahead + 1)]
+
+# ================= PLOT =================
+fig = go.Figure()
+
+# Actual
+fig.add_trace(go.Scatter(
+    x=monthly_xgb["MonthYear"],
+    y=monthly_xgb["Revenue"],
+    name="Actual",
+    line=dict(color="blue")
+))
+
+# Predicted (training fit)
+fig.add_trace(go.Scatter(
+    x=monthly_xgb["MonthYear"],
+    y=y_pred,
+    name="XGB Fit",
+    line=dict(color="orange")
+))
+
+# Future forecast
+fig.add_trace(go.Scatter(
+    x=future_dates,
+    y=future_pred,
+    name="Future Forecast",
+    line=dict(color="green", dash="dash")
+))
+
+st.plotly_chart(fig, use_container_width=True)
 
         # ================= PROPHET =================
         elif model_choice == "Prophet":
