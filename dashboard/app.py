@@ -172,7 +172,60 @@ elif page == "Demand Forecast":
 
     # ---------- Random Forest ----------
     elif model_choice == "Random Forest":
-        st.info("Random Forest uses trained model")
+    st.subheader("Random Forest Forecast")
+
+    if "rf" in models:
+
+        monthly_rf = monthly.copy()
+
+        # Feature engineering
+        monthly_rf["Month"] = monthly_rf["MonthYear"].dt.month
+        monthly_rf["Quarter"] = monthly_rf["MonthYear"].dt.quarter
+        monthly_rf["Lag1"] = monthly_rf["Revenue"].shift(1)
+        monthly_rf["Lag2"] = monthly_rf["Revenue"].shift(2)
+        monthly_rf["RollingMean"] = monthly_rf["Revenue"].rolling(3).mean()
+
+        monthly_rf = monthly_rf.dropna()
+
+        features = ["MonthIndex", "Month", "Quarter", "Lag1", "Lag2", "RollingMean"]
+
+        preds = models["rf"].predict(monthly_rf[features])
+
+        # 📈 GRAPH
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            x=monthly_rf["MonthYear"],
+            y=monthly_rf["Revenue"],
+            mode="lines+markers",
+            name="Actual"
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=monthly_rf["MonthYear"],
+            y=preds,
+            mode="lines+markers",
+            name="Predicted",
+            line=dict(dash="dash")
+        ))
+
+        fig.update_layout(title="Random Forest: Actual vs Predicted")
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # 📊 TABLE
+        st.subheader("Prediction Table")
+
+        table = pd.DataFrame({
+            "Month": monthly_rf["MonthYear"].dt.strftime("%b %Y"),
+            "Actual Revenue": monthly_rf["Revenue"],
+            "Predicted Revenue": preds
+        })
+
+        st.dataframe(table, use_container_width=True)
+
+    else:
+        st.error("Random Forest model not found. Train model first.")
 
     # ---------- ARIMA ----------
     elif model_choice == "ARIMA":
