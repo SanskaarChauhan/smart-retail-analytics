@@ -232,7 +232,7 @@ if data_loaded:
     st.sidebar.caption(f"📅 Data: {metrics.get('Date From','N/A')} → {metrics.get('Date To','N/A')}")
 status = "🟢 Online" if data_loaded else "🔴 Offline"
 st.sidebar.caption(f"Status: {status}")
-st.sidebar.caption("BCA Final Year Project")
+
 
 if st.sidebar.button("🚪 Logout", use_container_width=True):
     for key in list(st.session_state.keys()):
