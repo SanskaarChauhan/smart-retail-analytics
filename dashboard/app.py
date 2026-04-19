@@ -139,22 +139,22 @@ def show_login():
         st.markdown("")
 
         if st.button(" Login", type="primary", use_container_width=True):
-    if not username or not password:
-        st.warning("Please enter both username and password.")
-    else:
-        from src.auth import login as auth_login
-        success, result = auth_login(username, password)
+            if not username or not password:
+                st.warning("Please enter both username and password.")
+            else:
+                from src.auth import login as auth_login
+                success, result = auth_login(username, password)
 
-        if success:
-            st.session_state.user = username
-            st.session_state.role = result
-            st.success(f" Welcome, {username.title()}!")
-            st.rerun()
-        elif isinstance(result, str) and result.startswith("locked:"):
-            seconds = result.split(":")[1]
-            st.error(f" Account locked. Too many failed attempts. Try again in {seconds} seconds.")
-        else:
-            st.error(" Invalid credentials. Contact your administrator.")
+                if success:
+                    st.session_state.user = username
+                    st.session_state.role = result
+                    st.success(f" Welcome, {username.title()}!")
+                    st.rerun()
+                elif isinstance(result, str) and result.startswith("locked:"):
+                    seconds = result.split(":")[1]
+                    st.error(f" Account locked. Too many failed attempts. Try again in {seconds} seconds.")
+                else:
+                    st.error(" Invalid credentials. Contact your administrator.")
 
         st.markdown("---")
         st.caption("Don't have an account? Contact your company admin.")
