@@ -150,3 +150,54 @@ if __name__ == "__main__":
     metrics = summary_metrics(df)
     print_metrics(metrics)
     check_required_files()
+
+# src/utils.py — add this function
+
+REQUIRED_COLUMNS = {
+    "InvoiceNo"   : "object",
+    "StockCode"   : "object",
+    "Description" : "object",
+    "Quantity"    : "int64",
+    "InvoiceDate" : "datetime64",
+    "UnitPrice"   : "float64",
+    "CustomerID"  : "float64",
+    "Country"     : "object",
+}
+
+def validate_dataset(df) -> tuple:
+    """
+    Validate uploaded dataset before processing.
+    Returns (is_valid, list_of_errors).
+    """
+    errors = []
+
+    # Check required columns exist
+    for col in REQUIRED_COLUMNS:
+        if col not in df.columns:
+            errors.append(f"Missing required column: '{col}'")
+
+    if errors:
+        return False, errors
+
+    # Check minimum rows
+    if len(df) < 100:
+        errors.append(f"Dataset too small: {len(df)} rows (minimum 100 required).")
+
+    # Check InvoiceDate is parseable
+    try:
+        pd.to_datetime(df["InvoiceDate"])
+    except Exception:
+        errors.append("Column 'InvoiceDate' cannot be parsed as dates.")
+
+    # Check numeric columns
+    for col in ["Quantity", "UnitPrice"]:
+        if col in df.columns:
+            if not pd.to_numeric(df[col], errors="coerce").notna().any():
+                errors.append(f"Column '{col}' has no valid numeric values.")
+
+    # Check for completely empty critical columns
+    for col in ["InvoiceNo", "CustomerID"]:
+        if col in df.columns and df[col].isna().all():
+            errors.append(f"Column '{col}' is entirely empty.")
+
+    return len(errors) == 0, errors
